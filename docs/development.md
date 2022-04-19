@@ -23,4 +23,3 @@ You can use `task test` or `task test-race` (slower, but checks for race conditi
 ## Building Docker image
 
 `task build-image` will build and tag a `sourcegraph/doctree:dev` image for you. `task run-image` will run it!
-

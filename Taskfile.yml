@@ -6,6 +6,7 @@ tasks:
     cmds:
       - task: build-tools
       - task: generate
+      - task: fmt
       - task: lint
       - task: build
       - task: run
@@ -50,12 +51,21 @@ tasks:
     sources:
       - ./**/*.go
 
+  fmt:
+    desc: Format code
+    cmds:
+      - .bin/gofumpt -l -w .
+    sources:
+      - ./**/*.go
+
   build-tools:
     desc: Build tool dependencies (golangci-lint, etc.)
     cmds:
       - GOBIN="$(pwd)/.bin" go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.45.2
+      - GOBIN="$(pwd)/.bin" go install mvdan.cc/gofumpt@latest
     status:
       - test -f .bin/golangci-lint
+      - test -f .bin/gofumpt
 
   build-image:
     desc: Build sourcegraph/doctree:dev Docker image

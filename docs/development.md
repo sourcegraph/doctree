@@ -3,7 +3,19 @@
 ## Prerequisites
 
 * Go v1.18+
-* [Task](https://taskfile.dev/#/installation) (alternative to `make` with file change watching)
+* A recent / latest LTS version of [Node.js](https://nodejs.org/)
+
+[Task](https://taskfile.dev/#/installation) (alternative to `make` with file change watching):
+
+```sh
+brew install go-task/tap/go-task
+```
+
+[Elm](https://elm-lang.org/) and [elm-spa](https://elm-spa.dev):
+
+```sh
+npm install -g elm elm-spa
+```
 
 ## Working with the code
 

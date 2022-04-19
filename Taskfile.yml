@@ -51,7 +51,7 @@ tasks:
   build-tools:
     desc: Build tool dependencies (golangci-lint, etc.)
     cmds:
-      - GOBIN="$(pwd)/.bin" go get github.com/golangci/golangci-lint/cmd/golangci-lint
+      - GOBIN="$(pwd)/.bin" go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.45.2
     status:
       - test -f .bin/golangci-lint
 

@@ -1,0 +1,66 @@
+version: "3"
+
+tasks:
+  default:
+    desc: Run development server, watching code files for changes.
+    cmds:
+      - task: build-tools
+      - task: generate
+      - task: lint
+      - task: build
+      - task: run
+
+  build:
+    desc: Build .bin/doctree
+    cmds:
+      - mkdir -p .bin
+      - go build -o .bin/doctree ./cmd/doctree
+    env:
+      CGO_ENABLED: 0
+    sources:
+      - ./**/*.go
+    generates:
+      - .bin/doctree
+
+  run:
+    desc: Run .bin/doctree
+    cmds:
+      - .bin/doctree
+
+  test:
+    desc: Run all tests
+    cmds:
+      - go test ./...
+
+  test-race:
+    desc: Run all tests (checking for race conditions, slow)
+    cmds:
+      - go test -race ./...
+
+  generate:
+    desc: Produce generated code
+    cmds:
+      - go generate ./...
+
+  lint:
+    desc: Lint code
+    cmds:
+      - .bin/golangci-lint run ./...
+      - ./**/*.go
+
+  build-tools:
+    desc: Build tool dependencies (golangci-lint, etc.)
+    cmds:
+      - GOBIN="$(pwd)/.bin" go get github.com/golangci/golangci-lint/cmd/golangci-lint
+    status:
+      - test -f .bin/golangci-lint
+
+  build-image:
+    desc: Build sourcegraph/doctree:dev Docker image
+    cmds:
+      - docker build --no-cache -t sourcegraph/doctree:dev .
+
+  run-image:
+    desc: Run sourcegraph/doctree:dev Docker image
+    cmds:
+      - docker run -it sourcegraph/doctree:dev

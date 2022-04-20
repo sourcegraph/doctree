@@ -19,7 +19,7 @@ npm install -g elm elm-spa
 
 ## Working with the code
 
-Just run `task` in the repository root, it'll automatically do everything you need:
+Just run `task --watch` in the repository root, it'll automatically do everything you need:
 
 * Build development tools for you (linter, code formatter)
 * `go generate` any necessary code for you

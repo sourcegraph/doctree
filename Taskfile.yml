@@ -8,10 +8,41 @@ tasks:
       - task: generate
       - task: fmt
       - task: lint
-      - task: build
+      - task: build-go
+      - task: build-elm-debug
       - task: run
 
   build:
+    desc: Build Go + Elm code in release mode
+    cmds:
+      - task: build-go
+      - task: build-elm-release
+
+  build-elm-debug:
+    desc: Build Elm frontend code (debug mode)
+    cmds:
+      - cd frontend/ && elm-spa gen
+      - cd frontend/ && mkdir -p public/dist/
+      - cd frontend/ && elm make --debug .elm-spa/defaults/Main.elm --output ./public/dist/elm.js
+    sources:
+      - ./frontend/src/**/*.elm
+    generates:
+      - .elm-spa/**/*
+      - public/dist/elm.js
+
+  build-elm-release:
+    desc: Build Elm frontend code (release mode, minified, etc.)
+    cmds:
+      - cd frontend/ && elm-spa gen
+      - cd frontend/ && mkdir -p public/dist/
+      - cd frontend/ && elm make .elm-spa/defaults/Main.elm --output ./public/dist/elm.js
+    sources:
+      - ./frontend/src/**/*.elm
+    generates:
+      - .elm-spa/**/*
+      - public/dist/elm.js
+
+  build-go:
     desc: Build .bin/doctree
     cmds:
       - mkdir -p .bin

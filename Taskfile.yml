@@ -4,13 +4,27 @@ tasks:
   default:
     desc: Run development server, watching code files for changes.
     cmds:
-      - task: build-tools
-      - task: generate
+      - task --parallel fmt-lint backend frontend --watch
+
+  fmt-lint:
+    desc: "Run formatters and linters"
+    cmds:
       - task: fmt
       - task: lint
-      - task: build-go
-      - task: build-elm-debug
-      - task: run
+
+  backend:
+    desc: Run "doctree serve" backend
+    cmds:
+      - .bin/doctree serve
+    env:
+      ELM_DEBUG_SERVER: "http://localhost:1234/"
+    deps:
+      - build-go
+
+  frontend:
+    desc: Run Elm frontend dev server
+    cmds:
+      - cd frontend/ && elm-spa server | grep -v 'Ready at'
 
   build:
     desc: Build Go + Elm code in release mode
@@ -54,11 +68,6 @@ tasks:
     generates:
       - .bin/doctree
 
-  run:
-    desc: Run .bin/doctree
-    cmds:
-      - .bin/doctree
-
   test:
     desc: Run all tests
     cmds:
@@ -73,6 +82,8 @@ tasks:
     desc: Produce generated code
     cmds:
       - go generate ./...
+    sources:
+      - ./**/*.go
 
   lint:
     desc: Lint code
@@ -81,6 +92,8 @@ tasks:
       - .bin/golangci-lint run --go=1.17 ./...
     sources:
       - ./**/*.go
+    deps:
+      - build-tools
 
   fmt:
     desc: Format code
@@ -88,6 +101,8 @@ tasks:
       - .bin/gofumpt -l -w .
     sources:
       - ./**/*.go
+    deps:
+      - build-tools
 
   build-tools:
     desc: Build tool dependencies (golangci-lint, etc.)

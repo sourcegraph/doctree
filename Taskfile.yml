@@ -61,8 +61,6 @@ tasks:
     cmds:
       - mkdir -p .bin
       - go build -o .bin/doctree ./cmd/doctree
-    env:
-      CGO_ENABLED: 0
     sources:
       - ./**/*.go
     generates:

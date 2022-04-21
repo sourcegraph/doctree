@@ -6,7 +6,7 @@ FROM docker.io/library/golang:1.18 as builder
 
 COPY . /doctree
 ENV GOBIN /out
-RUN cd /doctree && CGO_ENABLED=0 go install ./cmd/doctree
+RUN cd /doctree && go install ./cmd/doctree
 
 # Dockerfile based on guidelines at https://github.com/hexops/dockerfile
 FROM alpine:3.15

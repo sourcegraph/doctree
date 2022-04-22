@@ -17,6 +17,7 @@ Usage:
 
 The commands are:
 	serve    runs a doctree server
+	index    index a directory
 
 Use "doctree <command> -h" for more information about a command.
 `

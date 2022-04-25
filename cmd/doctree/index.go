@@ -4,7 +4,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"os"
 	"path/filepath"
 	"time"
 
@@ -26,15 +25,10 @@ Examples:
 
 `
 
-	home, err := os.UserHomeDir()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "warning: could not get home directory: %s", err)
-		home = "."
-	}
-
 	// Parse flags for our subcommand.
 	flagSet := flag.NewFlagSet("index", flag.ExitOnError)
-	dataDirFlag := flagSet.String("data-dir", filepath.Join(home, ".doctree"), "where doctree stores its data")
+	dataDirFlag := flagSet.String("data-dir", defaultDataDir(), "where doctree stores its data")
+	projectFlag := flagSet.String("project", defaultProjectName(), "name of the project")
 
 	// Handles calls to our subcommand.
 	handler := func(args []string) error {
@@ -51,7 +45,7 @@ Examples:
 		}
 
 		indexDataDir := filepath.Join(*dataDirFlag, "index")
-		writeErr := indexer.WriteIndexes(dir, indexDataDir, indexes)
+		writeErr := indexer.WriteIndexes(*projectFlag, indexDataDir, indexes)
 		if indexErr != nil && writeErr != nil {
 			return multierror.Append(indexErr, writeErr)
 		}

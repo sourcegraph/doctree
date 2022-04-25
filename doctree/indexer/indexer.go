@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"io/fs"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -109,10 +110,10 @@ func IndexDir(ctx context.Context, dir string) (map[string]*schema.Index, error)
 	return results, errs
 }
 
-// WriteIndexes writes indexes to the index directory:
+// WriteIndexes writes indexes to the index data directory:
 //
-// index/<index_id>/<language_id>
-func WriteIndexes(indexedDir, indexDataDir string, indexes map[string]*schema.Index) error {
+// index/<project_name>/<language_id>
+func WriteIndexes(projectName string, indexDataDir string, indexes map[string]*schema.Index) error {
 	// TODO: binary format?
 	// TODO: compression
 
@@ -122,12 +123,8 @@ func WriteIndexes(indexedDir, indexDataDir string, indexes map[string]*schema.In
 	if err != nil {
 		return errors.Wrap(err, "Abs")
 	}
-	indexedDir, err = filepath.Abs(indexedDir)
-	if err != nil {
-		return errors.Wrap(err, "Abs")
-	}
 
-	outDir := filepath.Join(indexDataDir, pathToIndexID(indexedDir))
+	outDir := filepath.Join(indexDataDir, encodeProjectName(projectName))
 
 	// Delete any old index data in this dir (e.g. if we had python+go before, but now only go, we
 	// need to delete python index.)
@@ -152,6 +149,58 @@ func WriteIndexes(indexedDir, indexDataDir string, indexes map[string]*schema.In
 	return nil
 }
 
-func pathToIndexID(path string) string {
-	return strings.ReplaceAll(strings.Trim(path, "/"), "/", "-")
+// Lists all indexes found in the index data directory.
+func List(indexDataDir string) ([]string, error) {
+	dir, err := ioutil.ReadDir(indexDataDir)
+	if err != nil {
+		return nil, errors.Wrap(err, "ReadDir")
+	}
+	var indexes []string
+	for _, info := range dir {
+		if info.IsDir() {
+			indexes = append(indexes, decodeProjectName(info.Name()))
+		}
+	}
+	return indexes, nil
+}
+
+// Get gets all the language indexes for the specified project.
+func Get(indexDataDir, projectName string) (map[string]schema.Index, error) {
+	indexName := encodeProjectName(projectName)
+	if strings.Contains(indexName, "/") || strings.Contains(indexName, "..") {
+		return nil, errors.New("potentially malicious index name (this is likely a bug)")
+	}
+
+	indexes := map[string]schema.Index{}
+	dir, err := ioutil.ReadDir(filepath.Join(indexDataDir, indexName))
+	if err != nil {
+		return nil, errors.Wrap(err, "ReadDir")
+	}
+	for _, info := range dir {
+		if !info.IsDir() {
+			lang := info.Name()
+
+			f, err := os.Open(filepath.Join(indexDataDir, indexName, lang))
+			if err != nil {
+				return nil, errors.Wrap(err, "Open")
+			}
+			defer f.Close()
+
+			var decoded schema.Index
+			if err := json.NewDecoder(f).Decode(&decoded); err != nil {
+				return nil, errors.Wrap(err, "Decode")
+			}
+
+			indexes[lang] = decoded
+		}
+	}
+	return indexes, nil
+}
+
+func encodeProjectName(name string) string {
+	return strings.ReplaceAll(name, "/", "---")
+}
+
+func decodeProjectName(name string) string {
+	return strings.ReplaceAll(name, "---", "/")
 }

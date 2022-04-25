@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
@@ -8,9 +9,11 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"os"
+	"path/filepath"
 
 	"github.com/hexops/cmder"
 	"github.com/pkg/errors"
+	"github.com/sourcegraph/doctree/doctree/indexer"
 	"github.com/sourcegraph/doctree/frontend"
 )
 
@@ -30,12 +33,14 @@ Examples:
 
 	// Parse flags for our subcommand.
 	flagSet := flag.NewFlagSet("serve", flag.ExitOnError)
+	dataDirFlag := flagSet.String("data-dir", defaultDataDir(), "where doctree stores its data")
 	httpFlag := flagSet.String("http", ":3627", "address to bind for the HTTP server")
 
 	// Handles calls to our subcommand.
 	handler := func(args []string) error {
 		_ = flagSet.Parse(args)
-		return Serve(*httpFlag)
+		indexDataDir := filepath.Join(*dataDirFlag, "index")
+		return Serve(*httpFlag, indexDataDir)
 	}
 
 	// Register the command.
@@ -52,10 +57,53 @@ Examples:
 }
 
 // Serve an HTTP server on the given addr.
-func Serve(addr string) error {
+func Serve(addr, indexDataDir string) error {
 	log.Printf("Listening on %s", addr)
 	mux := http.NewServeMux()
 	mux.Handle("/", frontendHandler())
+	mux.Handle("/api/list", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// SECURITY: This endpoint isn't mutable and doesn't serve privileged information, and
+		// therefor safe to use from any origin.
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Content-Type", "application/json")
+
+		indexes, err := indexer.List(indexDataDir)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		b, err := json.Marshal(indexes)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		_, err = w.Write(b)
+		if err != nil {
+			return
+		}
+	}))
+	mux.Handle("/api/get", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// SECURITY: This endpoint isn't mutable and doesn't serve privileged information, and
+		// therefor safe to use from any origin.
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Content-Type", "application/json")
+
+		projectName := r.URL.Query().Get("name")
+		projectIndexes, err := indexer.Get(indexDataDir, projectName)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		b, err := json.Marshal(projectIndexes)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		_, err = w.Write(b)
+		if err != nil {
+			return
+		}
+	}))
 	if err := http.ListenAndServe(addr, mux); err != nil {
 		return errors.Wrap(err, "ListenAndServe")
 	}

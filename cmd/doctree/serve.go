@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/NYTimes/gziphandler"
 	"github.com/hexops/cmder"
 	"github.com/pkg/errors"
 	"github.com/sourcegraph/doctree/doctree/indexer"
@@ -104,7 +105,8 @@ func Serve(addr, indexDataDir string) error {
 			return
 		}
 	}))
-	if err := http.ListenAndServe(addr, mux); err != nil {
+	muxWithGzip := gziphandler.GzipHandler(mux)
+	if err := http.ListenAndServe(addr, muxWithGzip); err != nil {
 		return errors.Wrap(err, "ListenAndServe")
 	}
 	return nil

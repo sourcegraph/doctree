@@ -1,63 +1,24 @@
 module Pages.NotFound exposing (Model, Msg, page)
 
-import Gen.Params.NotFound exposing (Params)
+-- elm-spa will invoke our NotFound page for any undefined route. We don't want
+-- to register a route for each /github.com/foo/bar, /gitlab.com/foo/bar, /project/path,
+-- etc. and so we direct our NotFound handler straight to the ProjectPage. elm-spa
+-- doesn't have a nicer way to do this.
+
 import Page
-import Request
+import ProjectPage
+import Request exposing (Request)
 import Shared
-import View exposing (View)
 
 
-page : Shared.Model -> Request.With Params -> Page.With Model Msg
+page : Shared.Model -> Request -> Page.With Model Msg
 page shared req =
-    Page.element
-        { init = init
-        , update = update
-        , view = view
-        , subscriptions = subscriptions
-        }
-
-
-
--- INIT
+    ProjectPage.page shared req
 
 
 type alias Model =
-    {}
+    ProjectPage.Model
 
 
-init : ( Model, Cmd Msg )
-init =
-    ( {}, Cmd.none )
-
-
-
--- UPDATE
-
-
-type Msg
-    = ReplaceMe
-
-
-update : Msg -> Model -> ( Model, Cmd Msg )
-update msg model =
-    case msg of
-        ReplaceMe ->
-            ( model, Cmd.none )
-
-
-
--- SUBSCRIPTIONS
-
-
-subscriptions : Model -> Sub Msg
-subscriptions model =
-    Sub.none
-
-
-
--- VIEW
-
-
-view : Model -> View Msg
-view model =
-    View.placeholder "NotFound"
+type alias Msg =
+    ProjectPage.Msg

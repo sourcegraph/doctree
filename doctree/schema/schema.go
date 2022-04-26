@@ -2,6 +2,9 @@
 // documentation.
 //
 // tree-sitter is used to emit documentation in this format, and the doctree frontend renders it.
+//
+// TODO: make SchemaVersion a semver type?
+// TODO: make make Library.Version a type instead of two separate fields
 package schema
 
 // LatestVersion of the doctree schema (semver.)
@@ -16,7 +19,7 @@ type Index struct {
 	Directory string `json:"directory"`
 
 	// CreatedAt time of the index (RFC3339)
-	CreatedAt string `json:"time"`
+	CreatedAt string `json:"createdAt"`
 
 	// NumFiles indexed.
 	NumFiles int `json:"numFiles"`
@@ -84,7 +87,7 @@ type Library struct {
 // browser.
 type Page struct {
 	// Title of the page.
-	Title string
+	Title string `json:"title"`
 
 	// Sections on the page.
 	Sections []Section `json:"sections"`

@@ -28,14 +28,14 @@ Examples:
 
   Use a specific port:
 
-    $ doctree serve -http=:3627
+    $ doctree serve -http=:3333
 
 `
 
 	// Parse flags for our subcommand.
 	flagSet := flag.NewFlagSet("serve", flag.ExitOnError)
 	dataDirFlag := flagSet.String("data-dir", defaultDataDir(), "where doctree stores its data")
-	httpFlag := flagSet.String("http", ":3627", "address to bind for the HTTP server")
+	httpFlag := flagSet.String("http", ":3333", "address to bind for the HTTP server")
 
 	// Handles calls to our subcommand.
 	handler := func(args []string) error {

@@ -119,7 +119,22 @@ func frontendHandler() http.Handler {
 		if err != nil {
 			panic(err)
 		}
-		return httputil.NewSingleHostReverseProxy(remote)
+		proxy := httputil.NewSingleHostReverseProxy(remote)
+
+		// Dev server hack to fix requests for "/github.com" etc. that appear as a request for file
+		// due to extension (.com), see public/index.html for more info.
+		defaultDirector := proxy.Director
+		proxy.Director = func(req *http.Request) {
+			defaultDirector(req)
+			_, err := os.Stat(filepath.Join("frontend/public", req.URL.Path))
+			if os.IsNotExist(err) {
+				queryParams := req.URL.RawQuery
+
+				req.URL.RawQuery = req.URL.Path + "&" + queryParams
+				req.URL.Path = "/"
+			}
+		}
+		return proxy
 	}
 
 	// Server assets that are embedded into Go binary.

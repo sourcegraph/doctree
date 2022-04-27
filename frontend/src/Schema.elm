@@ -112,15 +112,19 @@ type alias Library =
 pageDecoder : Decoder Page
 pageDecoder =
     Decode.succeed Page
+        |> Pipeline.required "path" Decode.string
         |> Pipeline.required "title" Decode.string
-        |> Pipeline.required "sections" (Decode.list sectionDecoder)
+        |> Pipeline.required "sections" (Decode.lazy (\_ -> sectionsDecoder))
 
 
 type alias Page =
-    { -- Title of the page.
+    { -- Path of the page relative to the library. This is the URL path and does not necessarily have
+      -- to match up with filepaths.
+      path : String
+    , -- Title of the page.
       title : String
     , -- Sections of the page.
-      sections : List Section
+      sections : Sections
     }
 
 

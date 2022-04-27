@@ -86,6 +86,10 @@ type Library struct {
 // Page is a single page of documentation, and typically gets rendered as a single page in the
 // browser.
 type Page struct {
+	// Path of the page relative to the library. This is the URL path and does not necessarily have
+	// to match up with filepaths.
+	Path string `json:"path"`
+
 	// Title of the page.
 	Title string `json:"title"`
 

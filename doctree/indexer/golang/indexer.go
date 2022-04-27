@@ -43,7 +43,7 @@ func (i *goIndexer) IndexDir(ctx context.Context, dir string) (*schema.Index, er
 
 	files := 0
 	bytes := 0
-	packages := map[string]struct{}{}
+	packages := map[string]packageInfo{}
 	functionsByPackage := map[string][]schema.Section{}
 	for _, path := range sources {
 		content, err := ioutil.ReadFile(path)
@@ -103,7 +103,7 @@ func (i *goIndexer) IndexDir(ctx context.Context, dir string) (*schema.Index, er
 			funcParams := firstCaptureContentOr(content, captures["func_params"], "")
 			funcResult := firstCaptureContentOr(content, captures["func_result"], "")
 
-			packages[pkgName] = struct{}{}
+			packages[pkgName] = packageInfo{path: filepath.Dir(path)}
 
 			funcLabel := schema.Markdown("func " + funcName + funcTypeParams + funcParams)
 			if funcResult != "" {
@@ -121,7 +121,7 @@ func (i *goIndexer) IndexDir(ctx context.Context, dir string) (*schema.Index, er
 	}
 
 	var pages []schema.Page
-	for pkgName := range packages {
+	for pkgName, pkgInfo := range packages {
 		functionsSection := schema.Section{
 			ID:         "func",
 			ShortLabel: "func",
@@ -131,6 +131,7 @@ func (i *goIndexer) IndexDir(ctx context.Context, dir string) (*schema.Index, er
 		}
 
 		pages = append(pages, schema.Page{
+			Path:     pkgInfo.path,
 			Title:    "Package " + pkgName,
 			Sections: []schema.Section{functionsSection},
 		})
@@ -150,6 +151,10 @@ func (i *goIndexer) IndexDir(ctx context.Context, dir string) (*schema.Index, er
 			Pages:       pages,
 		},
 	}, nil
+}
+
+type packageInfo struct {
+	path string
 }
 
 func firstCaptureContentOr(content []byte, captures []*sitter.Node, defaultValue string) string {

@@ -2,6 +2,8 @@ module ProjectPage exposing (Model, Msg, init, page, subscriptions, update, view
 
 import Dict
 import Element as E
+import Element.Font as Font
+import Element.Region as Region
 import Gen.Params.NotFound exposing (Params)
 import Html exposing (Html)
 import Http
@@ -140,11 +142,10 @@ view projectURI model =
                                 case uri of
                                     NameLanguagePageSection name language docPage section ->
                                         -- viewNameLanguagePageSection model name language docPage section
-                                        viewName model projectIndexes name
+                                        viewNameLanguagePage model projectIndexes name language docPage
 
                                     NameLanguagePage name language docPage ->
-                                        -- viewNameLanguagePage model name language docPage
-                                        viewName model projectIndexes name
+                                        viewNameLanguagePage model projectIndexes name language docPage
 
                                     NameLanguage name language ->
                                         viewNameLanguage model projectIndexes name language
@@ -181,9 +182,74 @@ viewNameLanguage model projectIndexes projectName language =
     case indexLookup of
         Just index ->
             E.layout []
-                (E.row []
-                    [ E.text index.schemaVersion ]
+                (E.column []
+                    [ E.el [ Region.heading 1, Font.size 32 ] (E.text projectName)
+
+                    -- TODO: Should UI sort pages, or indexers themselves decide order? Probably the latter?
+                    , E.column []
+                        (List.map
+                            (\docPage ->
+                                E.link []
+                                    { url =
+                                        Url.Builder.absolute [ projectName, "-", language, "-", docPage.path ] []
+                                    , label = E.text docPage.title
+                                    }
+                            )
+                            (List.sortBy .path index.library.pages)
+                        )
+                    ]
                 )
 
         Nothing ->
             E.layout [] (E.text "language not found")
+
+
+viewNameLanguagePage : Model -> Schema.ProjectIndexes -> String -> String -> String -> Html Msg
+viewNameLanguagePage model projectIndexes projectName language targetPagePath =
+    let
+        indexLookup =
+            Dict.get language projectIndexes
+
+        pageLookup =
+            Maybe.andThen
+                (\index ->
+                    List.head
+                        (List.filter (\docPage -> docPage.path == targetPagePath) index.library.pages)
+                )
+                indexLookup
+    in
+    case pageLookup of
+        Just docPage ->
+            E.layout []
+                (E.column []
+                    [ E.el [ Region.heading 1, Font.size 32 ]
+                        (E.text docPage.title)
+                    , renderSections docPage.sections
+                    ]
+                )
+
+        Nothing ->
+            E.layout [] (E.text "page not found")
+
+
+renderSections : Schema.Sections -> E.Element Msg
+renderSections sections =
+    let
+        list =
+            case sections of
+                Schema.Sections v ->
+                    v
+    in
+    E.column []
+        (List.map (\section -> renderSection section) list)
+
+
+renderSection : Schema.Section -> E.Element Msg
+renderSection section =
+    E.column []
+        [ E.column [ E.paddingXY 0 16 ]
+            [ E.text section.label
+            , E.text section.detail
+            ]
+        , E.el [ E.paddingXY 32 0 ] (renderSections section.children)
+        ]

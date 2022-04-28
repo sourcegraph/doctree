@@ -1,3 +1,4 @@
+// Package golang provides a doctree indexer implementation for Go.
 package golang
 
 import (
@@ -6,6 +7,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/pkg/errors"
 	sitter "github.com/smacker/go-tree-sitter"
@@ -66,57 +68,103 @@ func (i *goIndexer) IndexDir(ctx context.Context, dir string) (*schema.Index, er
 
 		// Inspect the root node.
 		n := tree.RootNode()
-		query, err := sitter.NewQuery([]byte(`
-			(source_file
-				(package_clause
-					(package_identifier) @package_name
-				) @package_clause
-				(function_declaration
-					name: (identifier) @func_name
-					type_parameters: (type_parameter_list)? @func_type_params
-					parameters: (parameter_list)? @func_params
-					result: (qualified_type package: (package_identifier) name: (type_identifier))? @func_result
+
+		// Package clauses
+		var pkgName string
+		{
+			query, err := sitter.NewQuery([]byte(`
+				(
+					(comment)* @package_docs
+					.
+					(package_clause
+						(package_identifier) @package_name
+					) @package_clause
+					(#strip! @package_docs "^//\\s*")
+					(#set-adjacent! @package_docs @package_name)
 				)
-			) @file
-		`), golang.GetLanguage())
-		if err != nil {
-			return nil, errors.Wrap(err, "NewQuery")
+			`), golang.GetLanguage())
+			if err != nil {
+				return nil, errors.Wrap(err, "NewQuery")
+			}
+			defer query.Close()
+
+			cursor := sitter.NewQueryCursor()
+			defer cursor.Close()
+			cursor.Exec(query, n)
+
+			for {
+				match, ok := cursor.NextMatch()
+				if !ok {
+					break
+				}
+				captures := getCaptures(query, match)
+
+				pkgDocs := joinCaptures(content, captures["package_docs"], "\n")
+				pkgClause := firstCaptureContentOr(content, captures["package_clause"], "")
+				_ = pkgClause // TODO: use me!
+				pkgName = firstCaptureContentOr(content, captures["package_name"], "")
+
+				if existing, ok := packages[pkgName]; ok {
+					if pkgDocs != "" {
+						existing.docs += "\n"
+						existing.docs += pkgDocs
+					}
+					packages[pkgName] = existing
+				} else {
+					packages[pkgName] = packageInfo{path: filepath.Dir(path), docs: pkgDocs}
+				}
+			}
 		}
-		defer query.Close()
 
-		cursor := sitter.NewQueryCursor()
-		defer cursor.Close()
-		cursor.Exec(query, n)
-
-		for {
-			match, ok := cursor.NextMatch()
-			if !ok {
-				break
+		// Function definitions
+		{
+			query, err := sitter.NewQuery([]byte(`
+				(
+					(comment)* @func_docs
+					.
+					(function_declaration
+						name: (identifier) @func_name
+						type_parameters: (type_parameter_list)? @func_type_params
+						parameters: (parameter_list)? @func_params
+						result: (qualified_type package: (package_identifier) name: (type_identifier))? @func_result
+					)
+				)
+			`), golang.GetLanguage())
+			if err != nil {
+				return nil, errors.Wrap(err, "NewQuery")
 			}
-			captures := getCaptures(query, match)
+			defer query.Close()
 
-			pkgClause := firstCaptureContentOr(content, captures["package_clause"], "")
-			_ = pkgClause // TODO: use me!
-			pkgName := firstCaptureContentOr(content, captures["package_name"], "")
-			funcName := firstCaptureContentOr(content, captures["func_name"], "")
-			funcTypeParams := firstCaptureContentOr(content, captures["func_type_params"], "")
-			funcParams := firstCaptureContentOr(content, captures["func_params"], "")
-			funcResult := firstCaptureContentOr(content, captures["func_result"], "")
+			cursor := sitter.NewQueryCursor()
+			defer cursor.Close()
+			cursor.Exec(query, n)
 
-			packages[pkgName] = packageInfo{path: filepath.Dir(path)}
+			for {
+				match, ok := cursor.NextMatch()
+				if !ok {
+					break
+				}
+				captures := getCaptures(query, match)
 
-			funcLabel := schema.Markdown("func " + funcName + funcTypeParams + funcParams)
-			if funcResult != "" {
-				funcLabel = funcLabel + schema.Markdown(" "+funcResult)
+				funcDocs := joinCaptures(content, captures["func_docs"], "\n")
+				funcName := firstCaptureContentOr(content, captures["func_name"], "")
+				funcTypeParams := firstCaptureContentOr(content, captures["func_type_params"], "")
+				funcParams := firstCaptureContentOr(content, captures["func_params"], "")
+				funcResult := firstCaptureContentOr(content, captures["func_result"], "")
+
+				funcLabel := schema.Markdown("func " + funcName + funcTypeParams + funcParams)
+				if funcResult != "" {
+					funcLabel = funcLabel + schema.Markdown(" "+funcResult)
+				}
+				funcs := functionsByPackage[pkgName]
+				funcs = append(funcs, schema.Section{
+					ID:         funcName,
+					ShortLabel: funcName,
+					Label:      funcLabel,
+					Detail:     schema.Markdown(funcDocs),
+				})
+				functionsByPackage[pkgName] = funcs
 			}
-			funcs := functionsByPackage[pkgName]
-			funcs = append(funcs, schema.Section{
-				ID:         funcName,
-				ShortLabel: funcName,
-				Label:      funcLabel,
-				Detail:     "TODO",
-			})
-			functionsByPackage[pkgName] = funcs
 		}
 	}
 
@@ -126,13 +174,13 @@ func (i *goIndexer) IndexDir(ctx context.Context, dir string) (*schema.Index, er
 			ID:         "func",
 			ShortLabel: "func",
 			Label:      "Functions",
-			Detail:     schema.Markdown("Package " + pkgName + " provides ...TODO..."),
 			Children:   functionsByPackage[pkgName],
 		}
 
 		pages = append(pages, schema.Page{
 			Path:     pkgInfo.path,
 			Title:    "Package " + pkgName,
+			Detail:   schema.Markdown(pkgInfo.docs),
 			Sections: []schema.Section{functionsSection},
 		})
 	}
@@ -155,6 +203,7 @@ func (i *goIndexer) IndexDir(ctx context.Context, dir string) (*schema.Index, er
 
 type packageInfo struct {
 	path string
+	docs string
 }
 
 func firstCaptureContentOr(content []byte, captures []*sitter.Node, defaultValue string) string {
@@ -162,6 +211,14 @@ func firstCaptureContentOr(content []byte, captures []*sitter.Node, defaultValue
 		return captures[0].Content(content)
 	}
 	return defaultValue
+}
+
+func joinCaptures(content []byte, captures []*sitter.Node, sep string) string {
+	var v []string
+	for _, capture := range captures {
+		v = append(v, capture.Content(content))
+	}
+	return strings.Join(v, sep)
 }
 
 func getCaptures(q *sitter.Query, m *sitter.QueryMatch) map[string][]*sitter.Node {

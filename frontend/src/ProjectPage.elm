@@ -168,8 +168,18 @@ view projectURI model =
 viewName : Model -> Schema.ProjectIndexes -> String -> Html Msg
 viewName model projectIndexes projectName =
     E.layout []
-        (E.row []
-            (List.map (\language -> E.link [] { url = String.concat [ Url.Builder.absolute [ projectName, "-", language ] [] ], label = E.text language }) (Dict.keys projectIndexes))
+        (E.column []
+            (List.map
+                (\language ->
+                    E.link []
+                        { url =
+                            String.concat
+                                [ Url.Builder.absolute [ projectName, "-", language ] [] ]
+                        , label = E.text language
+                        }
+                )
+                (Dict.keys projectIndexes)
+            )
         )
 
 
@@ -222,8 +232,10 @@ viewNameLanguagePage model projectIndexes projectName language targetPagePath =
         Just docPage ->
             E.layout []
                 (E.column []
-                    [ E.el [ Region.heading 1, Font.size 32 ]
-                        (E.text docPage.title)
+                    [ E.column []
+                        [ E.el [ Region.heading 1, Font.size 32 ] (E.text docPage.title)
+                        , E.text docPage.detail
+                        ]
                     , renderSections docPage.sections
                     ]
                 )

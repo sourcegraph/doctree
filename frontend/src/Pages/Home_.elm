@@ -78,7 +78,7 @@ view model =
                 Just response ->
                     case response of
                         Ok list ->
-                            E.row [] (List.map (\projectName -> E.link [] { url = projectName, label = E.text projectName }) list)
+                            E.column [] (List.map (\projectName -> E.link [] { url = projectName, label = E.text projectName }) list)
 
                         Err err ->
                             E.text (Debug.toString err)

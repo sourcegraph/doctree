@@ -114,6 +114,7 @@ pageDecoder =
     Decode.succeed Page
         |> Pipeline.required "path" Decode.string
         |> Pipeline.required "title" Decode.string
+        |> Pipeline.required "detail" Decode.string
         |> Pipeline.required "sections" (Decode.lazy (\_ -> sectionsDecoder))
 
 
@@ -123,6 +124,8 @@ type alias Page =
       path : String
     , -- Title of the page.
       title : String
+    , -- The detail
+      detail : Markdown
     , -- Sections of the page.
       sections : Sections
     }

@@ -93,6 +93,9 @@ type Page struct {
 	// Title of the page.
 	Title string `json:"title"`
 
+	// The detail
+	Detail Markdown `json:"detail"`
+
 	// Sections on the page.
 	Sections []Section `json:"sections"`
 }

@@ -1,12 +1,12 @@
 module ProjectPage exposing (Model, Msg, init, page, subscriptions, update, view)
 
 import Dict
+import Effect exposing (Effect)
 import Element as E
 import Element.Font as Font
 import Element.Region as Region
 import Gen.Params.NotFound exposing (Params)
 import Html exposing (Html)
-import Http
 import Page
 import Request
 import Schema
@@ -24,10 +24,10 @@ page shared req =
         projectURI =
             parseProjectURI rawProjectURI
     in
-    Page.element
+    Page.advanced
         { init = init projectURI
         , update = update
-        , view = view projectURI
+        , view = view shared projectURI
         , subscriptions = subscriptions
         }
 
@@ -63,42 +63,35 @@ parseProjectURI uri =
 
 
 type alias Model =
-    { projectIndexes : Maybe (Result Http.Error Schema.ProjectIndexes) }
+    {}
 
 
-init : Maybe ProjectURI -> ( Model, Cmd Msg )
+init : Maybe ProjectURI -> ( Model, Effect Msg )
 init projectURI =
-    ( { projectIndexes = Nothing }
+    ( {}
     , case projectURI of
         Just uri ->
-            fetchProject uri
+            Effect.fromShared (Shared.GetProject (projectURIName uri))
 
         Nothing ->
-            Cmd.none
+            Effect.none
     )
 
 
-fetchProject : ProjectURI -> Cmd Msg
-fetchProject projectURI =
-    let
-        projectName =
-            case projectURI of
-                Name v ->
-                    v
+projectURIName : ProjectURI -> String
+projectURIName projectURI =
+    case projectURI of
+        Name v ->
+            v
 
-                NameLanguage v _ ->
-                    v
+        NameLanguage v _ ->
+            v
 
-                NameLanguagePage v _ _ ->
-                    v
+        NameLanguagePage v _ _ ->
+            v
 
-                NameLanguagePageSection v _ _ _ ->
-                    v
-    in
-    Http.get
-        { url = Url.Builder.absolute [ "api", "get" ] [ Url.Builder.string "name" projectName ]
-        , expect = Http.expectJson GotProject Schema.projectIndexesDecoder
-        }
+        NameLanguagePageSection v _ _ _ ->
+            v
 
 
 
@@ -106,14 +99,14 @@ fetchProject projectURI =
 
 
 type Msg
-    = GotProject (Result Http.Error Schema.ProjectIndexes)
+    = NoOp
 
 
-update : Msg -> Model -> ( Model, Cmd Msg )
+update : Msg -> Model -> ( Model, Effect Msg )
 update msg model =
     case msg of
-        GotProject projectIndexes ->
-            ( { model | projectIndexes = Just projectIndexes }, Cmd.none )
+        NoOp ->
+            ( model, Effect.none )
 
 
 
@@ -129,11 +122,11 @@ subscriptions model =
 -- VIEW
 
 
-view : Maybe ProjectURI -> Model -> View Msg
-view projectURI model =
+view : Shared.Model -> Maybe ProjectURI -> Model -> View Msg
+view shared projectURI model =
     { title = "TODO"
     , body =
-        [ case model.projectIndexes of
+        [ case shared.projectIndexes of
             Just response ->
                 case response of
                     Ok projectIndexes ->

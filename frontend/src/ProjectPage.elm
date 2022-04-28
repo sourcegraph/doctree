@@ -230,11 +230,27 @@ viewNameLanguagePage model projectIndexes projectName language targetPagePath =
     in
     case pageLookup of
         Just docPage ->
+            let
+                subpages =
+                    case docPage.subpages of
+                        Schema.Pages v ->
+                            v
+            in
             E.layout []
                 (E.column []
                     [ E.column []
                         [ E.el [ Region.heading 1, Font.size 32 ] (E.text docPage.title)
                         , E.text docPage.detail
+                        , if List.length subpages > 0 then
+                            E.column []
+                                (List.concat
+                                    [ [ E.el [ Region.heading 1, Font.size 32 ] (E.text "Subpages") ]
+                                    , List.map (\subPage -> E.link [] { url = subPage.path, label = E.text subPage.title }) subpages
+                                    ]
+                                )
+
+                          else
+                            E.none
                         ]
                     , renderSections docPage.sections
                     ]

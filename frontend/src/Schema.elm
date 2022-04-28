@@ -116,6 +116,7 @@ pageDecoder =
         |> Pipeline.required "title" Decode.string
         |> Pipeline.required "detail" Decode.string
         |> Pipeline.required "sections" (Decode.lazy (\_ -> sectionsDecoder))
+        |> Pipeline.optional "subpages" (Decode.lazy (\_ -> pagesDecoder)) (Pages [])
 
 
 type alias Page =
@@ -128,7 +129,17 @@ type alias Page =
       detail : Markdown
     , -- Sections of the page.
       sections : Sections
+    , -- Subpages of this one.
+      subpages : Pages
     }
+
+
+type Pages
+    = Pages (List Page)
+
+
+pagesDecoder =
+    Decode.map Pages <| Decode.list (Decode.lazy (\_ -> pageDecoder))
 
 
 sectionDecoder : Decoder Section

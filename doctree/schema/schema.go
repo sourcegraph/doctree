@@ -98,6 +98,9 @@ type Page struct {
 
 	// Sections on the page.
 	Sections []Section `json:"sections"`
+
+	// Subpages of this one.
+	Subpages []Page `json:"subpages,omitempty"`
 }
 
 // Section represents a single section of documentation on a page. These give you building blocks

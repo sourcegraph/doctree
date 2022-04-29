@@ -1,12 +1,14 @@
 module Pages.Home_ exposing (Model, Msg, page)
 
 import Element as E
+import Element.Font as Font
 import Gen.Params.Home_ exposing (Params)
 import Http
 import Json.Decode as D
 import Page
 import Request
 import Shared
+import Style
 import View exposing (View)
 
 
@@ -73,12 +75,15 @@ view : Model -> View Msg
 view model =
     { title = "doctree"
     , body =
-        [ E.layout []
+        [ E.layout [ Style.font, E.fill |> E.width ]
             (case model.list of
                 Just response ->
                     case response of
                         Ok list ->
-                            E.column [] (List.map (\projectName -> E.link [] { url = projectName, label = E.text projectName }) list)
+                            E.column [ E.centerX, E.paddingXY 0 64 ]
+                                [ logo
+                                , projectsList list
+                                ]
 
                         Err err ->
                             E.text (Debug.toString err)
@@ -88,3 +93,39 @@ view model =
             )
         ]
     }
+
+
+logo =
+    E.row [ E.centerX ]
+        [ E.image
+            [ E.width (E.px 120)
+            , E.paddingEach { top = 0, right = 140, bottom = 0, left = 0 }
+            ]
+            { src = "/mascot.svg", description = "cute computer / doctree mascot" }
+        , E.column []
+            [ E.el [ Font.size 64, Font.bold ] (E.text "doctree")
+            , E.el [ Font.semiBold ] (E.text "documentation for every language")
+            ]
+        ]
+
+
+projectsList list =
+    E.column [ E.centerX ]
+        [ Style.h2 [ E.paddingXY 0 32 ] (E.text "# Your projects")
+        , E.column []
+            (List.map
+                (\projectName ->
+                    E.link [ E.paddingXY 0 4 ]
+                        { url = projectName
+                        , label =
+                            E.row []
+                                [ E.text "• "
+                                , E.el [ Font.underline ] (E.text projectName)
+                                ]
+                        }
+                )
+                list
+            )
+        , Style.h2 [ E.paddingXY 0 32 ] (E.text "# Index a project")
+        , E.el [ Font.size 16 ] (E.text "$ doctree index -project='foobar' .")
+        ]

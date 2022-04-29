@@ -152,6 +152,9 @@ func WriteIndexes(projectName string, indexDataDir string, indexes map[string]*s
 // Lists all indexes found in the index data directory.
 func List(indexDataDir string) ([]string, error) {
 	dir, err := ioutil.ReadDir(indexDataDir)
+	if os.IsNotExist(err) {
+		return []string{}, nil
+	}
 	if err != nil {
 		return nil, errors.Wrap(err, "ReadDir")
 	}

@@ -2,8 +2,9 @@
 ###############################
 # Build the doctree Go binary #
 ###############################
-FROM docker.io/library/golang:1.18 as builder
+FROM golang:1.18-alpine as builder
 
+RUN apk add --no-cache git build-base
 COPY . /doctree
 ENV GOBIN /out
 RUN cd /doctree && go install ./cmd/doctree
@@ -23,11 +24,15 @@ RUN addgroup --gid 10001 --system nonroot \
     && adduser  --uid 10000 --system --ingroup nonroot --home /home/nonroot nonroot
 
 # Copy Go binary from builder image
-COPY --from=builder /out/ /sbin
+COPY --from=builder /out/ /usr/local/bin
+
+# For doctree to inspect Git repository URIs.
+RUN apk add --no-cache git
 
 # Create data volume.
-RUN mkdir -p /home/nonroot/data
-VOLUME /home/nonroot/data
+RUN mkdir -p /home/nonroot/.doctree
+RUN chown -R nonroot:nonroot /home/nonroot/.doctree
+VOLUME /home/nonroot/.doctree
 
 # Tini allows us to avoid several Docker edge cases, see https://github.com/krallin/tini.
 # NOTE: See https://github.com/hexops/dockerfile#is-tini-still-required-in-2020-i-thought-docker-added-it-natively
@@ -43,6 +48,6 @@ RUN apk add --no-cache bind-tools
 USER nonroot
 
 # Default arguments for your app (remove if you have none):
-EXPOSE 8080
+EXPOSE 3333
 CMD ["serve"]
 

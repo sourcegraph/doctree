@@ -75,7 +75,7 @@ view : Model -> View Msg
 view model =
     { title = "doctree"
     , body =
-        [ E.layout [ Style.font, E.fill |> E.width ]
+        [ E.layout (List.concat [ Style.layout, [ E.width E.fill ] ])
             (case model.list of
                 Just response ->
                     case response of

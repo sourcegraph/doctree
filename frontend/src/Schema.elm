@@ -146,6 +146,7 @@ sectionDecoder : Decoder Section
 sectionDecoder =
     Decode.succeed Section
         |> Pipeline.required "id" Decode.string
+        |> Pipeline.required "category" Decode.bool
         |> Pipeline.required "shortLabel" Decode.string
         |> Pipeline.required "label" Decode.string
         |> Pipeline.required "detail" Decode.string
@@ -155,6 +156,11 @@ sectionDecoder =
 type alias Section =
     { -- The ID of this section, used in the hyperlink to link to this section of the page.
       id : String
+    , -- Category indicates if this section is just describing a category of children, for example
+      -- if this section has the label "Functions" and Children are all of the functions in the
+      -- library. This information is used to pick out key sections that should be shown in high-level
+      -- navigation.
+      category : Bool
     , -- ShortLabel is the shortest string that can describe this section relative to the parent. For
       -- example, in Go this may be `(r) GetName` as a reduced form of `func (r *Route) GetName`.
       shortLabel : String

@@ -7,6 +7,8 @@
   * Linking to sections should be possible
   * Viewing root (top level) Go packages doesn't work ("." recorded as path by indexer?)
   * "Package graphqlbackend" should be accompanied by it's description (not full detail) in schema.
+  * Need a real Markdown renderer!
+  * Need to scroll back to top of page after new page load.
 * Go indexer
   * should fully implement schema / be a role model
   * snapshot tests!

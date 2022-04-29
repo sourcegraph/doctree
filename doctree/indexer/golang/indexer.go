@@ -183,6 +183,7 @@ func (i *goIndexer) IndexDir(ctx context.Context, dir string) (*schema.Index, er
 			ID:         "func",
 			ShortLabel: "func",
 			Label:      "Functions",
+			Category:   true,
 			Children:   functionsByPackage[pkgName],
 		}
 

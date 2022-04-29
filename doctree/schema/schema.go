@@ -121,6 +121,12 @@ type Section struct {
 	// The ID of this section, used in the hyperlink to link to this section of the page.
 	ID string `json:"id"`
 
+	// Category indicates if this section is just describing a category of children, for example
+	// if this section has the label "Functions" and Children are all of the functions in the
+	// library. This information is used to pick out key sections that should be shown in high-level
+	// navigation.
+	Category bool `json:"category"`
+
 	// ShortLabel is the shortest string that can describe this section relative to the parent. For
 	// example, in Go this may be `(r) GetName` as a reduced form of `func (r *Route) GetName`.
 	ShortLabel string `json:"shortLabel"`

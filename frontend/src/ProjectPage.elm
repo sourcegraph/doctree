@@ -297,7 +297,7 @@ renderSection : Schema.Section -> E.Element Msg
 renderSection section =
     E.column []
         [ E.column [ maxWidth ]
-            [ if section.detail == "" then
+            [ if section.category then
                 Style.h2 [ E.paddingXY 0 8 ] (E.text (String.concat [ "# ", section.label ]))
 
               else

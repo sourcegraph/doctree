@@ -99,7 +99,7 @@ func IndexDir(ctx context.Context, dir string) (map[string]*schema.Index, error)
 				mu.Lock()
 				defer mu.Unlock()
 				if err != nil {
-					errs = multierror.Append(errs, err)
+					errs = multierror.Append(errs, errors.Wrap(err, indexer.Name().ID+": IndexDir"))
 				} else {
 					results[indexer.Name().ID] = index
 				}

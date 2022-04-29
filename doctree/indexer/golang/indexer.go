@@ -84,7 +84,6 @@ func (i *goIndexer) IndexDir(ctx context.Context, dir string) (*schema.Index, er
 					(package_clause
 						(package_identifier) @package_name
 					) @package_clause
-					(#strip! @package_docs "^//\\s*")
 					(#set-adjacent! @package_docs @package_name)
 				)
 			`), golang.GetLanguage())
@@ -111,7 +110,7 @@ func (i *goIndexer) IndexDir(ctx context.Context, dir string) (*schema.Index, er
 
 				if existing, ok := packages[pkgName]; ok {
 					if pkgDocs != "" {
-						existing.docs += "\n"
+						existing.docs += "\n\n"
 						existing.docs += pkgDocs
 					}
 					packages[pkgName] = existing
@@ -171,7 +170,7 @@ func (i *goIndexer) IndexDir(ctx context.Context, dir string) (*schema.Index, er
 					ID:         funcName,
 					ShortLabel: funcName,
 					Label:      funcLabel,
-					Detail:     schema.Markdown(funcDocs),
+					Detail:     schema.Markdown(cleanDocs(funcDocs, false)),
 				})
 				functionsByPackage[pkgName] = funcs
 			}
@@ -190,7 +189,7 @@ func (i *goIndexer) IndexDir(ctx context.Context, dir string) (*schema.Index, er
 		pages = append(pages, schema.Page{
 			Path:     pkgInfo.path,
 			Title:    "Package " + pkgName,
-			Detail:   schema.Markdown(pkgInfo.docs),
+			Detail:   schema.Markdown(cleanDocs(pkgInfo.docs, true)),
 			Sections: []schema.Section{functionsSection},
 		})
 	}
@@ -209,6 +208,54 @@ func (i *goIndexer) IndexDir(ctx context.Context, dir string) (*schema.Index, er
 			Pages:       pages,
 		},
 	}, nil
+}
+
+func cleanDocs(s string, pkgDocs bool) string {
+	var paragraphs []string
+	current := ""
+	encounteredCopyright := false
+	encounteredPackageFoo := false
+	for _, l := range strings.Split(s, "\n") {
+		if strings.HasPrefix(l, "//go:") {
+			continue
+		}
+		realLine := strings.TrimSpace(strings.TrimPrefix(l, "//"))
+
+		// HACK: https://sourcegraph.slack.com/archives/C03BPE4EGUF/p1651204988551869
+		// Tree-sitter query cannot give us newlines between comments, so copyright section ends up
+		// as same paragraph as `Package foo` docs.
+		if strings.HasPrefix(realLine, "Copyright") {
+			encounteredCopyright = true
+		}
+		if encounteredCopyright && !encounteredPackageFoo {
+			if strings.HasPrefix(realLine, "Package ") {
+				encounteredPackageFoo = true
+			} else {
+				continue
+			}
+		}
+
+		current = strings.TrimSpace(current + " " + realLine)
+		if strings.TrimSpace(realLine) == "" && current != "" {
+			paragraphs = append(paragraphs, current)
+			current = ""
+		}
+	}
+	if current != "" {
+		paragraphs = append(paragraphs, current)
+	}
+
+	var desirable []string
+	for _, p := range paragraphs {
+		if strings.HasPrefix(p, "Copyright") {
+			continue
+		}
+		if strings.Contains(p, "DO NOT EDIT") {
+			continue
+		}
+		desirable = append(desirable, p)
+	}
+	return strings.Join(desirable, "\n\n\n")
 }
 
 type packageInfo struct {

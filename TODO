@@ -1,15 +1,18 @@
 * Elm frontend
   * UI design (there is none yet!)
-  * When you click a project, you shouldn't have to click the language name `go` to see docs.
+    * Project pages look quite scary! Need search here?
+  * Right now, "go" is hard-coded in the URL. Need to fix this and figure out how to merge multiple languages in the same project into one page, etc.
   * Auto-index projects previously `doctree add .`'d (watch for changes)
   * Only show exported symbols by default, add "filters" or "tags" to schema
   * Linking to sections should be possible
   * Viewing root (top level) Go packages doesn't work ("." recorded as path by indexer?)
+  * "Package graphqlbackend" should be accompanied by it's description (not full detail) in schema.
 * Go indexer
   * should fully implement schema / be a role model
   * snapshot tests!
   * Comment strings show `//` before them.
   * `//go:` directives should be stripped out
+  * `//go:build` directives are not respected, e.g. `func Fuzz(data []byte)` in encoding/json.
   * Some function signatures not working: http://localhost:3333/github.com/sourcegraph/sourcegraph/-/go/-/cmd/frontend/graphqlbackend
   * Should track packages by path+pkgName, not pkgName (e.g. multiple `main` packages are "merged")
   * Methods

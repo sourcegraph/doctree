@@ -50,6 +50,9 @@ func (i *goIndexer) IndexDir(ctx context.Context, dir string) (*schema.Index, er
 	packages := map[string]packageInfo{}
 	functionsByPackage := map[string][]schema.Section{}
 	for _, path := range sources {
+		if strings.HasSuffix(path, "_test.go") {
+			continue
+		}
 		content, err := ioutil.ReadFile(path)
 		if err != nil {
 			return nil, errors.Wrap(err, "ReadFile")
@@ -153,6 +156,11 @@ func (i *goIndexer) IndexDir(ctx context.Context, dir string) (*schema.Index, er
 				funcTypeParams := firstCaptureContentOr(content, captures["func_type_params"], "")
 				funcParams := firstCaptureContentOr(content, captures["func_params"], "")
 				funcResult := firstCaptureContentOr(content, captures["func_result"], "")
+
+				firstRune := []rune(funcName)[0]
+				if string(firstRune) != strings.ToUpper(string(firstRune)) {
+					continue // unexported
+				}
 
 				funcLabel := schema.Markdown("func " + funcName + funcTypeParams + funcParams)
 				if funcResult != "" {

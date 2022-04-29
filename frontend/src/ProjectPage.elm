@@ -144,7 +144,7 @@ view shared projectURI model =
                                         viewNameLanguage model projectIndexes name language
 
                                     Name name ->
-                                        viewName model projectIndexes name
+                                        viewNameLanguage model projectIndexes name "go"
 
                             Nothing ->
                                 E.layout [] (E.text "loading..")

@@ -184,22 +184,37 @@ viewNameLanguage model projectIndexes projectName language =
     in
     case indexLookup of
         Just index ->
-            E.layout []
-                (E.column []
-                    [ E.el [ Region.heading 1, Font.size 32 ] (E.text projectName)
-
-                    -- TODO: Should UI sort pages, or indexers themselves decide order? Probably the latter?
-                    , E.column []
-                        (List.map
-                            (\docPage ->
-                                E.link []
-                                    { url =
-                                        Url.Builder.absolute [ projectName, "-", language, "-", docPage.path ] []
-                                    , label = E.text docPage.title
-                                    }
+            E.layout [ E.width E.fill ]
+                (E.column [ E.centerX, E.paddingXY 0 32 ]
+                    [ E.row []
+                        [ E.link [] { url = "/", label = logo }
+                        , E.el [ Region.heading 1, Font.size 24 ] (E.text (String.concat [ " / ", projectName ]))
+                        ]
+                    , E.row [ E.width E.fill, E.paddingXY 0 64 ]
+                        -- TODO: Should UI sort pages, or indexers themselves decide order? Probably the latter?
+                        [ E.column [ E.width (E.fillPortion 1) ]
+                            (List.map
+                                (\docPage ->
+                                    E.link [ E.width (E.fillPortion 1) ]
+                                        { url =
+                                            Url.Builder.absolute [ projectName, "-", language, "-", docPage.path ] []
+                                        , label = E.el [ Font.underline ] (E.text docPage.path)
+                                        }
+                                )
+                                (List.sortBy .path index.library.pages)
                             )
-                            (List.sortBy .path index.library.pages)
-                        )
+                        , E.column [ E.width (E.fillPortion 1) ]
+                            (List.map
+                                (\docPage ->
+                                    E.link [ E.width (E.fillPortion 1) ]
+                                        { url =
+                                            Url.Builder.absolute [ projectName, "-", language, "-", docPage.path ] []
+                                        , label = E.el [ Font.underline ] (E.text docPage.title)
+                                        }
+                                )
+                                (List.sortBy .path index.library.pages)
+                            )
+                        ]
                     ]
                 )
 
@@ -273,4 +288,15 @@ renderSection section =
             , E.text section.detail
             ]
         , E.el [ E.paddingXY 32 0 ] (renderSections section.children)
+        ]
+
+
+logo =
+    E.row [ E.centerX ]
+        [ E.image
+            [ E.width (E.px 40)
+            , E.paddingEach { top = 0, right = 45, bottom = 0, left = 0 }
+            ]
+            { src = "/mascot.svg", description = "cute computer / doctree mascot" }
+        , E.el [ Font.size 32, Font.bold ] (E.text "doctree")
         ]

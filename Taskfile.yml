@@ -19,7 +19,7 @@ tasks:
     env:
       ELM_DEBUG_SERVER: "http://localhost:1234/"
     deps:
-      - build-go
+      - build-go-debug
 
   frontend:
     desc: Run Elm frontend dev server
@@ -29,7 +29,8 @@ tasks:
   build:
     desc: Build Go + Elm code in release mode
     cmds:
-      - task: build-go
+      - task: build-go-release
+    deps:
       - task: build-elm-release
 
   build-elm-debug:
@@ -56,13 +57,24 @@ tasks:
       - .elm-spa/**/*
       - public/dist/elm.js
 
-  build-go:
-    desc: Build .bin/doctree
+  build-go-debug:
+    desc: Build .bin/doctree (debug)
     cmds:
       - mkdir -p .bin
       - go build -o .bin/doctree ./cmd/doctree
     sources:
       - ./**/*.go
+    generates:
+      - .bin/doctree
+
+  build-go-release:
+    desc: Build .bin/doctree (release)
+    cmds:
+      - mkdir -p .bin
+      - go build -o .bin/doctree ./cmd/doctree
+    sources:
+      - ./**/*.go
+      - ./frontend/public/**
     generates:
       - .bin/doctree
 

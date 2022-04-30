@@ -24,7 +24,7 @@ Features (aspirational):
 * Symbol search
 * Finds usage examples automagically
 * Based on tree-sitter
-* Runnable standalone or via http://doctree.dev
+* Runnable standalone or via http://doctree.org (not yet online)
 
 ## Try it out (**EXTREMELY** early stages)
 

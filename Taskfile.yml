@@ -117,6 +117,12 @@ tasks:
     deps:
       - build-tools
 
+  install-frontend-deps:
+    desc: Install frontend dependencies
+    dir: frontend
+    cmds:
+      - npm install
+
   build-tools:
     desc: Build tool dependencies (golangci-lint, etc.)
     cmds:

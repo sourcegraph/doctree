@@ -1,0 +1,11 @@
+{
+  "name": "doctree-frontend",
+  "version": "1.0.0",
+  "description": "Frontend for Doctree",
+  "license": "Apache",
+  "private": true,
+  "devDependencies": {
+    "elm": "^0.19.1-5",
+    "elm-spa": "^6.0.4"
+  }
+}

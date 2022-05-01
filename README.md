@@ -35,13 +35,13 @@ Use Docker for now (working on single-binary builds still):
 Run the server:
 
 ```sh
-docker run -it --publish 3333:3333 --rm --name doctree --volume ~/.doctree:/home/nonroot/.doctree sourcegraph/doctree:dev
+docker run -it --publish 3333:3333 --rm --name doctree --volume ~/.doctree:/home/nonroot/.doctree slimsag/doctree:dev
 ```
 
 In a folder with Go code you'd like to see docs for, index it (for a large project like `golang/go` expect it to take ~52s for now. It's not multi-threaded.):
 
 ```sh
-docker run -it --volume $(pwd):/index --volume ~/.doctree:/home/nonroot/.doctree --entrypoint=sh sourcegraph/doctree:dev -c "cd /index && doctree index ."
+docker run -it --volume $(pwd):/index --volume ~/.doctree:/home/nonroot/.doctree --entrypoint=sh slimsag/doctree:dev -c "cd /index && doctree index ."
 ```
 
 Navigate to https://localhost:3333

@@ -2,15 +2,13 @@
 // documentation.
 //
 // tree-sitter is used to emit documentation in this format, and the doctree frontend renders it.
-//
-// TODO: make SchemaVersion a semver type?
-// TODO: make make Library.Version a type instead of two separate fields
 package schema
 
 // LatestVersion of the doctree schema (semver.)
 const LatestVersion = "0.0.1"
 
-// Index is the top-most data structure in the doctree schema.
+// Index is the top-most data structure in the doctree schema. It is produed by running a language
+// indexer over a directory, which may contain one or more libraries of code.
 type Index struct {
 	// The version of the doctree schema in use. Set this to the LatestVersion constant.
 	SchemaVersion string `json:"schemaVersion"`
@@ -58,8 +56,8 @@ var (
 	LanguageZig        = Language{Title: "Zig", ID: "zig"}
 )
 
-// Library documentation, the most top-level data structure. Represents a code library / a logical
-// unit of code typically distributed by package managers.
+// Library documentation, represents a code library / a logical unit of code typically distributed
+// by package managers.
 type Library struct {
 	// Name of the library
 	Name string `json:"name"`

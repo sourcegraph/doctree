@@ -9,6 +9,9 @@
   * "Package graphqlbackend" should be accompanied by it's description (not full detail) in schema.
   * Need a real Markdown renderer!
   * Need to scroll back to top of page after new page load.
+* Schema:
+  * Make SchemaVersion a semver type
+  * Make Library.Version a struct type instead of two separate fields (VersionType)
 * Go indexer
   * should fully implement schema / be a role model
   * snapshot tests!

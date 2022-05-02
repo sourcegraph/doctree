@@ -141,3 +141,83 @@ tasks:
     desc: Run sourcegraph/doctree:dev Docker image
     cmds:
       - docker run -it sourcegraph/doctree:dev
+
+  cross-compile:
+    desc: "Cross compile binaries using Zig (requires Go 1.18+, Zig 0.10+, macOS Monterey 12+ host machine)"
+    cmds:
+      - task: cc-x86_64-linux
+      - task: cc-x86_64-macos
+      - task: cc-aarch64-macos
+      - task: cc-x86_64-windows
+
+  cc-x86_64-linux:
+    desc: "Cross compile to x86_64-linux using Zig"
+    cmds:
+      - go build -o out/doctree-x86_64-linux ./cmd/doctree/
+    env:
+      CGO_ENABLED: "1"
+      GOOS: "linux"
+      GOARCH: "amd64"
+      CC: "zig cc -target x86_64-linux-gnu"
+      CXX: "zig c++ -target x86_64-linux-gnu"
+    sources:
+      - ./**/*.go
+      - ./frontend/public/**
+    generates:
+      - out/doctree-x86_64-macos
+    deps:
+      - task: build-elm-release
+
+  cc-x86_64-macos:
+    desc: "Cross compile to x86_64-macos using Zig (REQUIRES XCODE, ONLY WORKS ON MACOS)"
+    cmds:
+      - go build -o out/doctree-x86_64-macos -buildmode=pie -ldflags "-s -w -linkmode external -extldflags '--sysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -F /System/Library/Frameworks'" ./cmd/doctree/
+    env:
+      CGO_ENABLED: "1"
+      GOOS: "darwin"
+      GOARCH: "amd64"
+      CC: "zig cc -target x86_64-macos"
+      CXX: "zig c++ -target x86_64-macos"
+    sources:
+      - ./**/*.go
+      - ./frontend/public/**
+    generates:
+      - out/doctree-x86_64-macos
+    deps:
+      - task: build-elm-release
+
+  cc-aarch64-macos:
+    desc: "Cross compile to aarch64-macos using Zig (REQUIRES XCODE, ONLY WORKS ON MACOS 12+)"
+    cmds:
+      - go build -o out/doctree-aarch64-macos -buildmode=pie -ldflags "-s -w -linkmode external -extldflags '--sysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -F /System/Library/Frameworks'" ./cmd/doctree/
+    env:
+      CGO_ENABLED: "1"
+      GOOS: "darwin"
+      GOARCH: "arm64"
+      CC: "zig cc -target aarch64-macos"
+      CXX: "zig c++ -target aarch64-macos"
+    sources:
+      - ./**/*.go
+      - ./frontend/public/**
+    generates:
+      - out/doctree-aarch64-macos
+    deps:
+      - task: build-elm-release
+
+  cc-x86_64-windows:
+    desc: "Cross compile to x86_64-windows using Zig"
+    cmds:
+      - go build -o out/doctree-x86_64-windows.exe ./cmd/doctree/
+    env:
+      CGO_ENABLED: "1"
+      GOOS: "windows"
+      GOARCH: "amd64"
+      CC: "zig cc -Wno-dll-attribute-on-redeclaration -target x86_64-windows-gnu"
+      CXX: "zig c++ -target x86_64-windows-gnu"
+    sources:
+      - ./**/*.go
+      - ./frontend/public/**
+    generates:
+      - out/doctree-x86_64-windows.exe
+    deps:
+      - task: build-elm-release

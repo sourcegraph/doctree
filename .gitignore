@@ -8,3 +8,4 @@ dist
 generated/
 .bin
 .task
+out/

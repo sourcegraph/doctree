@@ -18,7 +18,7 @@ jobs:
       - name: Install dependencies
         run: |
           brew install go-task/tap/go-task
-          brew uninstall go # outdated version
+          brew uninstall go@1.17
           brew install go@1.18
           task install-frontend-deps
       - name: Cross-compile for every OS

@@ -30,6 +30,8 @@ jobs:
           echo "$DOCKER_PASSWORD" | docker login -u="$DOCKER_USERNAME" --password-stdin
           docker tag "sourcegraph/doctree:dev" "sourcegraph/doctree:$RELEASE_NAME"
           docker push "sourcegraph/doctree:$RELEASE_NAME"
+          docker tag "sourcegraph/doctree:dev" "sourcegraph/doctree:latest"
+          docker push "sourcegraph/doctree:latest"
         env:
           RELEASE_COMMIT: ${{steps.recorded_release_version.outputs.commit}}
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}

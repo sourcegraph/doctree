@@ -200,13 +200,15 @@ func (i *goIndexer) IndexDir(ctx context.Context, dir string) (*schema.Index, er
 		Language:      schema.LanguageGo,
 		NumFiles:      files,
 		NumBytes:      bytes,
-		Library: schema.Library{
-			Name:        "TODO",
-			Repository:  "TODO",
-			ID:          "TODO",
-			Version:     "TODO",
-			VersionType: "TODO",
-			Pages:       pages,
+		Libraries: []schema.Library{
+			{
+				Name:        "TODO",
+				Repository:  "TODO",
+				ID:          "TODO",
+				Version:     "TODO",
+				VersionType: "TODO",
+				Pages:       pages,
+			},
 		},
 	}, nil
 }

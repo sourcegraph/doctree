@@ -32,7 +32,7 @@ type Index struct {
 	Language Language `json:"language"`
 
 	// Library documentation.
-	Library Library `json:"library"`
+	Libraries []Library `json:"libraries"`
 }
 
 // Language name in canonical form, e.g. "Go", "Objective-C", etc.

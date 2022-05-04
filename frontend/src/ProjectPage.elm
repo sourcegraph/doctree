@@ -188,39 +188,48 @@ viewNameLanguage model projectIndexes projectName language =
     in
     case indexLookup of
         Just index ->
-            E.layout (List.concat [ Style.layout, [ E.width E.fill ] ])
-                (E.column [ E.centerX, E.paddingXY 0 32 ]
-                    [ E.row []
-                        [ E.link [] { url = "/", label = logo }
-                        , E.el [ Region.heading 1, Font.size 24 ] (E.text (String.concat [ " / ", projectName ]))
-                        ]
-                    , E.row [ E.width E.fill, E.paddingXY 0 64 ]
-                        -- TODO: Should UI sort pages, or indexers themselves decide order? Probably the latter?
-                        [ E.column [ E.width (E.fillPortion 1) ]
-                            (List.map
-                                (\docPage ->
-                                    E.link [ E.width (E.fillPortion 1) ]
-                                        { url =
-                                            Url.Builder.absolute [ projectName, "-", language, "-", docPage.path ] []
-                                        , label = E.el [ Font.underline ] (E.text docPage.path)
-                                        }
-                                )
-                                (List.sortBy .path index.library.pages)
-                            )
-                        , E.column [ E.width (E.fillPortion 1) ]
-                            (List.map
-                                (\docPage ->
-                                    E.link [ E.width (E.fillPortion 1) ]
-                                        { url =
-                                            Url.Builder.absolute [ projectName, "-", language, "-", docPage.path ] []
-                                        , label = E.el [ Font.underline ] (E.text docPage.title)
-                                        }
-                                )
-                                (List.sortBy .path index.library.pages)
-                            )
-                        ]
-                    ]
-                )
+            let
+                listHead =
+                    List.head index.libraries
+            in
+            case listHead of
+                Just library ->
+                    E.layout (List.concat [ Style.layout, [ E.width E.fill ] ])
+                        (E.column [ E.centerX, E.paddingXY 0 32 ]
+                            [ E.row []
+                                [ E.link [] { url = "/", label = logo }
+                                , E.el [ Region.heading 1, Font.size 24 ] (E.text (String.concat [ " / ", projectName ]))
+                                ]
+                            , E.row [ E.width E.fill, E.paddingXY 0 64 ]
+                                -- TODO: Should UI sort pages, or indexers themselves decide order? Probably the latter?
+                                [ E.column [ E.width (E.fillPortion 1) ]
+                                    (List.map
+                                        (\docPage ->
+                                            E.link [ E.width (E.fillPortion 1) ]
+                                                { url =
+                                                    Url.Builder.absolute [ projectName, "-", language, "-", docPage.path ] []
+                                                , label = E.el [ Font.underline ] (E.text docPage.path)
+                                                }
+                                        )
+                                        (List.sortBy .path library.pages)
+                                    )
+                                , E.column [ E.width (E.fillPortion 1) ]
+                                    (List.map
+                                        (\docPage ->
+                                            E.link [ E.width (E.fillPortion 1) ]
+                                                { url =
+                                                    Url.Builder.absolute [ projectName, "-", language, "-", docPage.path ] []
+                                                , label = E.el [ Font.underline ] (E.text docPage.title)
+                                                }
+                                        )
+                                        (List.sortBy .path library.pages)
+                                    )
+                                ]
+                            ]
+                        )
+
+                Nothing ->
+                    E.layout Style.layout (E.text "error: invalid index: must have at least on library")
 
         Nothing ->
             E.layout Style.layout (E.text "language not found")
@@ -229,16 +238,11 @@ viewNameLanguage model projectIndexes projectName language =
 viewNameLanguagePage : Model -> Schema.ProjectIndexes -> String -> String -> String -> Html Msg
 viewNameLanguagePage model projectIndexes projectName language targetPagePath =
     let
-        indexLookup =
-            Dict.get language projectIndexes
-
         pageLookup =
-            Maybe.andThen
-                (\index ->
-                    List.head
-                        (List.filter (\docPage -> docPage.path == targetPagePath) index.library.pages)
-                )
-                indexLookup
+            Dict.get language projectIndexes
+                |> Maybe.andThen (\index -> List.head index.libraries)
+                |> Maybe.andThen (\library -> Just (List.filter (\docPage -> docPage.path == targetPagePath) library.pages))
+                |> Maybe.andThen (\pages -> List.head pages)
     in
     case pageLookup of
         Just docPage ->

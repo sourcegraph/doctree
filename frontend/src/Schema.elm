@@ -41,7 +41,7 @@ indexDecoder =
         |> Pipeline.required "numBytes" Decode.int
         |> Pipeline.required "durationSeconds" Decode.float
         |> Pipeline.required "language" languageDecoder
-        |> Pipeline.required "library" libraryDecoder
+        |> Pipeline.required "libraries" (Decode.list libraryDecoder)
 
 
 type alias Index =
@@ -60,7 +60,7 @@ type alias Index =
     , -- Language name
       language : Language
     , -- Library documentation
-      library : Library
+      libraries : List Library
     }
 
 

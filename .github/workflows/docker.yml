@@ -20,6 +20,9 @@ jobs:
         run: |
           task install-frontend-deps
           task build-image
+      - name: Record latest release version
+        id: recorded_release_version
+        run: echo "::set-output name=commit::$(git log --oneline | head -n1 | cut -d " " -f1)"
       - name: Publish Docker image
         if: success() && github.ref == 'refs/heads/main' && github.repository == 'sourcegraph/doctree'
         run: |

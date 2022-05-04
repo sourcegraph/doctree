@@ -28,23 +28,79 @@ Features (aspirational):
 
 ## Try it out (**EXTREMELY** early stages)
 
-Probably not worth trying out unless you're *incredibly* excited about this idea.
+Probably not worth trying out yet unless you're *incredibly* excited about this idea.
 
-Use Docker for now (working on single-binary builds still):
+### Installation
+
+<details>
+<summary>macOS (Apple Silicon)</summary>
+
+```sh
+curl -L https://github.com/sourcegraph/doctree/releases/latest/download/doctree-aarch64-macos -o /usr/local/bin/doctree
+chmod +x /usr/local/bin/doctree
+```
+
+</details>
+
+<details>
+<summary>macOS (Intel)</summary>
+
+```sh
+curl -L https://github.com/sourcegraph/doctree/releases/latest/download/doctree-x86_64-macos -o /usr/local/bin/doctree
+chmod +x /usr/local/bin/doctree
+```
+
+</details>
+
+<details>
+<summary>Linux (x86_64)</summary>
+
+```sh
+curl -L https://github.com/sourcegraph/doctree/releases/latest/download/doctree-x86_64-linux -o /usr/local/bin/doctree
+chmod +x /usr/local/bin/doctree
+```
+
+</details>
+
+<details>
+<summary>Windows (x86_64)</summary>
+In an administrator PowerShell, run:
+
+```powershell
+New-Item -ItemType Directory 'C:\Program Files\Sourcegraph'
+
+Invoke-WebRequest https://github.com/sourcegraph/doctree/releases/latest/download/doctree-x86_64-windows.exe -OutFile 'C:\Program Files\Sourcegraph\doctree.exe'
+
+[Environment]::SetEnvironmentVariable('Path', [Environment]::GetEnvironmentVariable('Path', [EnvironmentVariableTarget]::Machine) + ';C:\Program Files\Sourcegraph', [EnvironmentVariableTarget]::Machine)
+$env:Path += ';C:\Program Files\Sourcegraph'
+```
+
+Or download [the exe file](https://github.com/sourcegraph/doctree/releases/latest/download/doctree-x86_64-windows.exe) and install it wherever you like.
+
+</details>
+
+<details>
+<summary>Via Docker</summary>
+
+Coming soon: https://github.com/sourcegraph/doctree/issues/20
+
+</details>
+
+### Usage
 
 Run the server:
 
 ```sh
-docker run -it --publish 3333:3333 --rm --name doctree --volume ~/.doctree:/home/nonroot/.doctree slimsag/doctree:dev
+doctree serve
 ```
 
-In a folder with Go code you'd like to see docs for, index it (for a large project like `golang/go` expect it to take ~52s for now. It's not multi-threaded.):
+Index a Go project (takes ~52s for a large project like golang/go itself, will be improved soon):
 
 ```sh
-docker run -it --volume $(pwd):/index --volume ~/.doctree:/home/nonroot/.doctree --entrypoint=sh slimsag/doctree:dev -c "cd /index && doctree index ."
+doctree index .
 ```
 
-Navigate to https://localhost:3333
+Navigate to http://localhost:3333
 
 ## Screenshots
 

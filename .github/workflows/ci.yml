@@ -33,11 +33,12 @@ jobs:
       - name: Release
         if: success() && github.ref == 'refs/heads/main' && github.event_Name == 'push' && github.repository == 'sourcegraph/doctree'
         run: |
-          gh release create "release-$RELEASE_COMMIT" --title "Release of main @ $RELEASE_COMMIT"
-          gh release upload "release-$RELEASE_COMMIT" out/doctree-aarch64-macos
-          gh release upload "release-$RELEASE_COMMIT" out/doctree-x86_64-linux
-          gh release upload "release-$RELEASE_COMMIT" out/doctree-x86_64-macos
-          gh release upload "release-$RELEASE_COMMIT" out/doctree-x86_64-windows.exe
+          export RELEASE_NAME="$(date --rfc-3339=date)-$RELEASE_COMMIT"
+          gh release create "release-$RELEASE_NAME" --title "Release of main @ $RELEASE_COMMIT"
+          gh release upload "release-$RELEASE_NAME" out/doctree-aarch64-macos
+          gh release upload "release-$RELEASE_NAME" out/doctree-x86_64-linux
+          gh release upload "release-$RELEASE_NAME" out/doctree-x86_64-macos
+          gh release upload "release-$RELEASE_NAME" out/doctree-x86_64-windows.exe
         env:
           RELEASE_COMMIT: ${{steps.recorded_release_version.outputs.commit}}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

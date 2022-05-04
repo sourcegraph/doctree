@@ -26,9 +26,10 @@ jobs:
       - name: Publish Docker image
         if: success() && github.ref == 'refs/heads/main' && github.repository == 'sourcegraph/doctree'
         run: |
+          export RELEASE_NAME="$(date --rfc-3339=date)-$RELEASE_COMMIT"
           echo "$DOCKER_PASSWORD" | docker login -u="$DOCKER_USERNAME" --password-stdin
-          docker tag "sourcegraph/doctree:dev" "sourcegraph/doctree:$RELEASE_COMMIT"
-          docker push "sourcegraph/doctree:$RELEASE_COMMIT"
+          docker tag "sourcegraph/doctree:dev" "sourcegraph/doctree:$RELEASE_NAME"
+          docker push "sourcegraph/doctree:$RELEASE_NAME"
         env:
           RELEASE_COMMIT: ${{steps.recorded_release_version.outputs.commit}}
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}

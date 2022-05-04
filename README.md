@@ -82,7 +82,31 @@ Or download [the exe file](https://github.com/sourcegraph/doctree/releases/lates
 <details>
 <summary>Via Docker</summary>
 
-Coming soon: https://github.com/sourcegraph/doctree/issues/20
+```sh
+docker run -it --publish 3333:3333 --rm --name doctree --volume ~/.doctree:/home/nonroot/.doctree sourcegraph/doctree:latest
+```
+
+In a folder with Go code you'd like to see docs for, index it (for a large project like `golang/go` expect it to take ~52s for now. It's not multi-threaded.):
+
+```sh
+docker run -it --volume $(pwd):/index --volume ~/.doctree:/home/nonroot/.doctree --entrypoint=sh sourcegraph/doctree:latest -c "cd /index && doctree index ."
+```
+
+</details>
+
+<details>
+<summary>#cloud-config</summary>
+
+```
+#cloud-config
+
+runcmd:
+  - apt update -y && apt upgrade -y && apt install -y docker.io
+  - apt install -y git
+  - git clone https://github.com/golang/go && cd go && docker run -it --volume $(pwd):/index --volume ~/.doctree:/home/nonroot/.doctree --entrypoint=sh sourcegraph/doctree:latest -c "cd /index && doctree index ."
+  - docker rm -f doctree || true
+  - docker run -d --rm --name doctree -p 80:3333 --volume ~/.doctree:/home/nonroot/.doctree sourcegraph/doctree:latest
+```
 
 </details>
 

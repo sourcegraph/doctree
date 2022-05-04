@@ -18,7 +18,7 @@ jobs:
       - name: Install dependencies
         run: |
           brew install go-task/tap/go-task
-          brew install golang@1.18
+          brew install go@1.18
           task install-frontend-deps
       - name: Cross-compile for every OS
         run: task cross-compile

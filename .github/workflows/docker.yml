@@ -1,0 +1,32 @@
+name: Docker images
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types:
+      - completed
+jobs:
+  main:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: "1.18"
+      - name: Install Task
+        uses: arduino/setup-task@v1
+      - name: Build Docker image
+        run: |
+          task install-frontend-deps
+          task build-image
+      - name: Publish Docker image
+        if: success() && github.ref == 'refs/heads/main' && github.event_Name == 'push' && github.repository == 'sourcegraph/doctree'
+        run: |
+          echo "$DOCKER_PASSWORD" | docker login -u="$DOCKER_USERNAME" --password-stdin
+          docker tag "sourcegraph/doctree:dev" "sourcegraph/doctree:$RELEASE_COMMIT"
+          docker push "sourcegraph/doctree:$RELEASE_COMMIT"
+        env:
+          RELEASE_COMMIT: ${{steps.recorded_release_version.outputs.commit}}
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}

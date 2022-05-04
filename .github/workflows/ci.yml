@@ -23,6 +23,8 @@ jobs:
           brew uninstall go@1.17
           brew install go@1.18
           task install-frontend-deps
+      - name: Run tests
+        run: task test
       - name: Cross-compile for every OS
         run: task cross-compile
       - name: Record latest release version
@@ -39,15 +41,3 @@ jobs:
         env:
           RELEASE_COMMIT: ${{steps.recorded_release_version.outputs.commit}}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Publish Docker image
-        if: success() && github.ref == 'refs/heads/main' && github.event_Name == 'push' && github.repository == 'sourcegraph/doctree'
-        run: |
-          brew install --cask docker
-          echo "$DOCKER_PASSWORD" | docker login -u="$DOCKER_USERNAME" --password-stdin
-          task build-image
-          docker tag "sourcegraph/doctree:dev" "sourcegraph/doctree:$RELEASE_COMMIT"
-          docker push "sourcegraph/doctree:$RELEASE_COMMIT"
-        env:
-          RELEASE_COMMIT: ${{steps.recorded_release_version.outputs.commit}}
-          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
-          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}

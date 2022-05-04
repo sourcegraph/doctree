@@ -21,7 +21,7 @@ jobs:
           task install-frontend-deps
           task build-image
       - name: Publish Docker image
-        if: success() && github.ref == 'refs/heads/main' && github.event_Name == 'push' && github.repository == 'sourcegraph/doctree'
+        if: success() && github.ref == 'refs/heads/main' && github.repository == 'sourcegraph/doctree'
         run: |
           echo "$DOCKER_PASSWORD" | docker login -u="$DOCKER_USERNAME" --password-stdin
           docker tag "sourcegraph/doctree:dev" "sourcegraph/doctree:$RELEASE_COMMIT"

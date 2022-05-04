@@ -42,6 +42,7 @@ jobs:
       - name: Publish Docker image
         if: success() && github.ref == 'refs/heads/main' && github.event_Name == 'push' && github.repository == 'sourcegraph/doctree'
         run: |
+          brew install docker
           echo "${DOCKER_PASSWORD}" | docker login -u="${DOCKER_USENAME}" --password-stdin
           task build-image
           docker tag "sourcegraph/doctree:dev" "sourcegraph/doctree:${RELEASE_COMMIT}"

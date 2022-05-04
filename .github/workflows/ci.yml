@@ -23,3 +23,17 @@ jobs:
           task install-frontend-deps
       - name: Cross-compile for every OS
         run: task cross-compile
+      - name: Record latest release version
+        id: recorded_release_version
+        run: echo "::set-output name=commit::$(git log --oneline | head -n1 | cut -d " " -f1)"
+      - name: Release
+        if: success() && github.ref == 'refs/heads/main' && github.event_Name == 'push' && github.repository == 'sourcegraph/doctree'
+        run: |
+          gh release create "release-$RELEASE_COMMIT" --title "Release of main @ $RELEASE_COMMIT"
+          gh release upload "release-$RELEASE_COMMIT" out/doctree-aarch64-macos
+          gh release upload "release-$RELEASE_COMMIT" out/doctree-x86_64-linux
+          gh release upload "release-$RELEASE_COMMIT" out/doctree-x86_64-macos
+          gh release upload "release-$RELEASE_COMMIT" out/doctree-x86_64-windows.exe
+        env:
+          RELEASE_COMMIT: ${{steps.recorded_release_version.outputs.commit}}
+          GITHUB_TOKEN: ${{ secrets.GH_PROJECTS_ACTION_TOKEN }}

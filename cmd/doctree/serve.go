@@ -138,5 +138,19 @@ func frontendHandler() http.Handler {
 	}
 
 	// Server assets that are embedded into Go binary.
-	return http.FileServer(http.FS(frontend.EmbeddedFS()))
+	fs := http.FS(frontend.EmbeddedFS())
+	fileServer := http.FileServer(fs)
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		// If there is not a file present, then this request is likely for a page like
+		// "/github.com/sourcegraph/sourcegraph" and we should still serve the SPA. Change the
+		// request path to "/" prior to serving so index.html is what gets served.
+		f, err := fs.Open(req.URL.Path)
+		if err != nil {
+			req.URL.Path = "/"
+		} else {
+			f.Close()
+		}
+
+		fileServer.ServeHTTP(w, req)
+	})
 }

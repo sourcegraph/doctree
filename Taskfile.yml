@@ -136,6 +136,8 @@ tasks:
     desc: Build sourcegraph/doctree:dev Docker image
     cmds:
       - docker build --no-cache -t sourcegraph/doctree:dev .
+    deps:
+      - task: build
 
   run-image:
     desc: Run sourcegraph/doctree:dev Docker image

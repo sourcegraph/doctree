@@ -9,8 +9,7 @@ import Element.Region as Region
 import Gen.Params.NotFound exposing (Params)
 import Html exposing (Html)
 import Html.Attributes exposing (style)
-import Markdown.Parser as Markdown
-import Markdown.Renderer
+import Markdown
 import Page
 import Request
 import Schema
@@ -273,7 +272,7 @@ viewNameLanguagePage model projectIndexes projectName language targetPagePath =
                             , E.el [ Region.heading 1, Font.size 20 ] (E.text (String.concat [ " : ", String.toLower docPage.title ]))
                             ]
                         , Style.h1 [] (E.text docPage.title)
-                        , E.el [ E.paddingXY 0 16 ] (renderMarkdown docPage.detail)
+                        , E.el [ E.paddingXY 0 16 ] (Markdown.render docPage.detail)
                         , if List.length subpages > 0 then
                             E.column []
                                 (List.concat
@@ -327,7 +326,7 @@ renderSection section =
                     , Border.widthEach { top = 0, left = 6, bottom = 0, right = 0 }
                     , E.paddingXY 16 16
                     ]
-                    (renderMarkdown section.detail)
+                    (Markdown.render section.detail)
             ]
         , E.el [] (renderSections section.children)
         ]
@@ -342,40 +341,3 @@ logo =
             { src = "/mascot.svg", description = "cute computer / doctree mascot" }
         , E.el [ Font.size 32, Font.bold ] (E.text "doctree")
         ]
-
-
-logoTiny =
-    E.image
-        [ E.width (E.px 40)
-        , E.paddingEach { top = 0, right = 45, bottom = 0, left = 0 }
-        ]
-        { src = "/mascot.svg", description = "cute computer / doctree mascot" }
-
-
-renderMarkdown markdown =
-    if False then
-        -- DEBUG: Render Markdown as plain text for debugging.
-        E.textColumn []
-            (List.map
-                (\paragraph -> E.paragraph [ E.paddingXY 0 4 ] [ E.text paragraph ])
-                (String.split "\n" markdown)
-            )
-
-    else
-        case
-            markdown
-                |> Markdown.parse
-                |> Result.mapError deadEndsToString
-                |> Result.andThen (\ast -> Markdown.Renderer.render Markdown.Renderer.defaultHtmlRenderer ast)
-        of
-            Ok rendered ->
-                E.column [ maxWidth, E.htmlAttribute (Html.Attributes.style "white-space" "normal") ] (List.map (\e -> E.html e) rendered)
-
-            Err errors ->
-                E.text errors
-
-
-deadEndsToString deadEnds =
-    deadEnds
-        |> List.map Markdown.deadEndToString
-        |> String.join "\n"

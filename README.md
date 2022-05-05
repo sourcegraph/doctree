@@ -103,9 +103,10 @@ docker run -it --volume $(pwd):/index --volume ~/.doctree:/home/nonroot/.doctree
 runcmd:
   - apt update -y && apt upgrade -y && apt install -y docker.io
   - apt install -y git
-  - git clone https://github.com/golang/go && cd go && docker run -it --volume $(pwd):/index --volume ~/.doctree:/home/nonroot/.doctree --entrypoint=sh sourcegraph/doctree:latest -c "cd /index && doctree index ."
+  - mkdir -p $HOME/.doctree && chown 10000:10001 -R ~/.doctree
+  - git clone https://github.com/golang/go && cd go && docker run -it --volume $(pwd):/index --volume $HOME/.doctree:/home/nonroot/.doctree --entrypoint=sh sourcegraph/doctree:latest -c "cd /index && doctree index ."
   - docker rm -f doctree || true
-  - docker run -d --rm --name doctree -p 80:3333 --volume ~/.doctree:/home/nonroot/.doctree sourcegraph/doctree:latest
+  - docker run -d --rm --name doctree -p 80:3333 --volume $HOME/.doctree:/home/nonroot/.doctree sourcegraph/doctree:latest
 ```
 
 </details>

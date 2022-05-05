@@ -105,8 +105,8 @@ func (i *goIndexer) IndexDir(ctx context.Context, dir string) (*schema.Index, er
 				}
 				captures := getCaptures(query, match)
 
-				pkgDocs := joinCaptures(content, captures["package_docs"], "\n")
 				pkgClause := firstCaptureContentOr(content, captures["package_clause"], "")
+				pkgDocs := commentsToMarkdown(content, extractPackageDocs(captures["package_docs"], captures["package_clause"]))
 				_ = pkgClause // TODO: use me!
 				pkgName = firstCaptureContentOr(content, captures["package_name"], "")
 
@@ -152,7 +152,7 @@ func (i *goIndexer) IndexDir(ctx context.Context, dir string) (*schema.Index, er
 				}
 				captures := getCaptures(query, match)
 
-				funcDocs := joinCaptures(content, captures["func_docs"], "\n")
+				funcDocs := commentsToMarkdown(content, captures["func_docs"])
 				funcName := firstCaptureContentOr(content, captures["func_name"], "")
 				funcTypeParams := firstCaptureContentOr(content, captures["func_type_params"], "")
 				funcParams := firstCaptureContentOr(content, captures["func_params"], "")
@@ -172,7 +172,7 @@ func (i *goIndexer) IndexDir(ctx context.Context, dir string) (*schema.Index, er
 					ID:         funcName,
 					ShortLabel: funcName,
 					Label:      funcLabel,
-					Detail:     schema.Markdown(cleanDocs(funcDocs, false)),
+					Detail:     schema.Markdown(funcDocs),
 				})
 				functionsByPackage[pkgName] = funcs
 			}
@@ -192,7 +192,7 @@ func (i *goIndexer) IndexDir(ctx context.Context, dir string) (*schema.Index, er
 		pages = append(pages, schema.Page{
 			Path:     pkgInfo.path,
 			Title:    "Package " + pkgName,
-			Detail:   schema.Markdown(cleanDocs(pkgInfo.docs, true)),
+			Detail:   schema.Markdown(pkgInfo.docs),
 			Sections: []schema.Section{functionsSection},
 		})
 	}
@@ -215,52 +215,57 @@ func (i *goIndexer) IndexDir(ctx context.Context, dir string) (*schema.Index, er
 	}, nil
 }
 
-func cleanDocs(s string, pkgDocs bool) string {
-	var paragraphs []string
-	current := ""
-	encounteredCopyright := false
-	encounteredPackageFoo := false
-	for _, l := range strings.Split(s, "\n") {
-		if strings.HasPrefix(l, "//go:") {
-			continue
-		}
-		realLine := strings.TrimSpace(strings.TrimPrefix(l, "//"))
-
-		// HACK: https://sourcegraph.slack.com/archives/C03BPE4EGUF/p1651204988551869
-		// Tree-sitter query cannot give us newlines between comments, so copyright section ends up
-		// as same paragraph as `Package foo` docs.
-		if strings.HasPrefix(realLine, "Copyright") {
-			encounteredCopyright = true
-		}
-		if encounteredCopyright && !encounteredPackageFoo {
-			if strings.HasPrefix(realLine, "Package ") {
-				encounteredPackageFoo = true
-			} else {
-				continue
+func commentsToMarkdown(content []byte, captures []*sitter.Node) string {
+	// Turn /* multiline */ and // single line comments into plain text.
+	var joined []string
+	for _, capture := range captures {
+		text := capture.Content(content)
+		if strings.HasPrefix(text, "/*") {
+			joined = append(joined, strings.TrimSuffix(strings.TrimPrefix(text, "/*"), "*/"))
+		} else {
+			var lines []string
+			for _, l := range strings.Split(text, "\n") {
+				realLine := strings.TrimPrefix(strings.TrimPrefix(l, "//"), " ")
+				lines = append(lines, realLine)
 			}
+			joined = append(joined, strings.Join(lines, "\n"))
 		}
+	}
+	s := strings.Join(joined, "\n")
 
-		current = strings.TrimSpace(current + " " + realLine)
-		if strings.TrimSpace(realLine) == "" && current != "" {
-			paragraphs = append(paragraphs, current)
-			current = ""
-		}
-	}
-	if current != "" {
-		paragraphs = append(paragraphs, current)
-	}
+	// Convert godoc strings into Markdown.
+	markdown := godocToMarkdown(s)
 
-	var desirable []string
-	for _, p := range paragraphs {
-		if strings.HasPrefix(p, "Copyright") {
-			continue
-		}
-		if strings.Contains(p, "DO NOT EDIT") {
-			continue
-		}
-		desirable = append(desirable, p)
+	// HACK: godocToMarkdown emits an extra blank line before closing code blocks, remove it.
+	markdown = strings.Replace(markdown, "\n```\n", "```\n", -1)
+	return strings.TrimSpace(markdown)
+}
+
+// The comments preceding a package clause are not always considered package docs. Only those
+// immediately preceding the package clause are, there may be a blank line separating a copyright
+// header in the file from the clause in which case they are not considered package docs. This
+// function picks out the last consecutive set of captured comments, and then returns that set only
+// if it directly precedes the clause.
+func extractPackageDocs(captures, pkgClauseCaptures []*sitter.Node) []*sitter.Node {
+	if len(pkgClauseCaptures) == 0 {
+		return nil
 	}
-	return godocToMarkdown(strings.Join(desirable, "\n\n\n"))
+	clause := pkgClauseCaptures[0].StartPoint()
+	var (
+		pkgDocs []*sitter.Node
+		lastRow uint32
+	)
+	for _, capture := range captures {
+		point := capture.EndPoint()
+		if point.Row != lastRow+1 {
+			pkgDocs = pkgDocs[:0]
+		}
+		pkgDocs = append(pkgDocs, capture)
+	}
+	if len(pkgDocs) == 0 || pkgDocs[len(pkgDocs)-1].EndPoint().Row != clause.Row-1 {
+		return nil
+	}
+	return pkgDocs
 }
 
 func godocToMarkdown(godoc string) string {
@@ -279,14 +284,6 @@ func firstCaptureContentOr(content []byte, captures []*sitter.Node, defaultValue
 		return captures[0].Content(content)
 	}
 	return defaultValue
-}
-
-func joinCaptures(content []byte, captures []*sitter.Node, sep string) string {
-	var v []string
-	for _, capture := range captures {
-		v = append(v, capture.Content(content))
-	}
-	return strings.Join(v, sep)
 }
 
 func getCaptures(q *sitter.Query, m *sitter.QueryMatch) map[string][]*sitter.Node {

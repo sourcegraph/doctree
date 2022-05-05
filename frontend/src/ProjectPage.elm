@@ -17,6 +17,7 @@ import Shared
 import Style
 import Url.Builder
 import View exposing (View)
+import Dict exposing (keys)
 
 
 page : Shared.Model -> Request.With Params -> Page.With Model Msg
@@ -148,7 +149,7 @@ view shared projectURI model =
                                         viewNameLanguage model projectIndexes name language
 
                                     Name name ->
-                                        viewNameLanguage model projectIndexes name "go"
+                                        viewNameLanguage model projectIndexes name ""
 
                             Nothing ->
                                 E.layout Style.layout (E.text "loading..")
@@ -182,9 +183,13 @@ viewName model projectIndexes projectName =
 
 viewNameLanguage : Model -> Schema.ProjectIndexes -> String -> String -> Html Msg
 viewNameLanguage model projectIndexes projectName language =
-    let
-        indexLookup =
-            Dict.get language projectIndexes
+    let firstLanguage = Maybe.withDefault "" (List.head (keys(projectIndexes)))
+        selectedLanguage = 
+            if language == "" then
+                firstLanguage
+            else
+                language
+        indexLookup = Dict.get selectedLanguage projectIndexes
     in
     case indexLookup of
         Just index ->
@@ -207,7 +212,7 @@ viewNameLanguage model projectIndexes projectName language =
                                         (\docPage ->
                                             E.link [ E.width (E.fillPortion 1) ]
                                                 { url =
-                                                    Url.Builder.absolute [ projectName, "-", language, "-", docPage.path ] []
+                                                    Url.Builder.absolute [ projectName, "-", selectedLanguage, "-", docPage.path ] []
                                                 , label = E.el [ Font.underline ] (E.text docPage.path)
                                                 }
                                         )
@@ -218,7 +223,7 @@ viewNameLanguage model projectIndexes projectName language =
                                         (\docPage ->
                                             E.link [ E.width (E.fillPortion 1) ]
                                                 { url =
-                                                    Url.Builder.absolute [ projectName, "-", language, "-", docPage.path ] []
+                                                    Url.Builder.absolute [ projectName, "-", selectedLanguage, "-", docPage.path ] []
                                                 , label = E.el [ Font.underline ] (E.text docPage.title)
                                                 }
                                         )

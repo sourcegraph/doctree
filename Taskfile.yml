@@ -53,7 +53,7 @@ tasks:
     cmds:
       - npx elm-spa gen
       - mkdir -p public/dist/
-      - npx elm make .elm-spa/defaults/Main.elm --output ./public/dist/elm.js
+      - npx elm make .elm-spa/defaults/Main.elm --optimize --output ./public/dist/elm.js
     sources:
       - ./frontend/src/**/*.elm
     generates:

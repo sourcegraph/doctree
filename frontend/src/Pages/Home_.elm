@@ -9,6 +9,7 @@ import Page
 import Request
 import Shared
 import Style
+import Util exposing (httpErrorToString)
 import View exposing (View)
 
 
@@ -86,7 +87,7 @@ view model =
                                 ]
 
                         Err err ->
-                            E.text (Debug.toString err)
+                            E.text (httpErrorToString err)
 
                 Nothing ->
                     E.text "loading.."

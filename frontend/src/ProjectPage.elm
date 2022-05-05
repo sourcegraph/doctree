@@ -16,6 +16,7 @@ import Schema
 import Shared
 import Style
 import Url.Builder
+import Util exposing (httpErrorToString)
 import View exposing (View)
 
 
@@ -154,7 +155,7 @@ view shared projectURI model =
                                 E.layout Style.layout (E.text "loading..")
 
                     Err err ->
-                        E.layout Style.layout (E.text (Debug.toString err))
+                        E.layout Style.layout (E.text (httpErrorToString err))
 
             Nothing ->
                 E.layout Style.layout (E.text "loading..")

@@ -2,6 +2,7 @@
 package golang
 
 import (
+	"bytes"
 	"context"
 	"io/fs"
 	"io/ioutil"
@@ -10,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	doc "github.com/slimsag/godocmd"
 	sitter "github.com/smacker/go-tree-sitter"
 	"github.com/smacker/go-tree-sitter/golang"
 	"github.com/sourcegraph/doctree/doctree/indexer"
@@ -258,7 +260,13 @@ func cleanDocs(s string, pkgDocs bool) string {
 		}
 		desirable = append(desirable, p)
 	}
-	return strings.Join(desirable, "\n\n\n")
+	return godocToMarkdown(strings.Join(desirable, "\n\n\n"))
+}
+
+func godocToMarkdown(godoc string) string {
+	var buf bytes.Buffer
+	doc.ToMarkdown(&buf, godoc, nil)
+	return buf.String()
 }
 
 type packageInfo struct {

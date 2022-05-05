@@ -1,4 +1,4 @@
-// Package golang provides a doctree indexer implementation for Go.
+// Package python provides a doctree indexer implementation for Python.
 package python
 
 import (
@@ -25,10 +25,10 @@ type pythonIndexer struct{}
 
 func (i *pythonIndexer) Name() schema.Language { return schema.LanguagePython }
 
-func (i *pythonIndexer) Extensions() []string { return []string{"py"} }
+func (i *pythonIndexer) Extensions() []string { return []string{"py", "py3"} }
 
 func (i *pythonIndexer) IndexDir(ctx context.Context, dir string) (*schema.Index, error) {
-	// Find Go sources
+	// Find Python sources
 	var sources []string
 	if err := fs.WalkDir(os.DirFS(dir), ".", func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -36,8 +36,8 @@ func (i *pythonIndexer) IndexDir(ctx context.Context, dir string) (*schema.Index
 		}
 		if !d.IsDir() {
 			ext := filepath.Ext(path)
-			if ext == ".py" {
-				sources = append(sources, dir+"/"+path)
+			if ext == ".py" || ext == ".py3" {
+				sources = append(sources, filepath.Clean(dir+"/"+path))
 			}
 		}
 		return nil
@@ -47,10 +47,9 @@ func (i *pythonIndexer) IndexDir(ctx context.Context, dir string) (*schema.Index
 
 	files := 0
 	bytes := 0
-	packages := map[string]packageInfo{}
-	functionsByPackage := map[string][]schema.Section{}
+	mods := map[string]moduleInfo{}
+	functionsByMod := map[string][]schema.Section{}
 	for _, path := range sources {
-		path := filepath.Clean(path)
 		if strings.Contains(path, "test_") || strings.Contains(path, "_test") || strings.Contains(path, "tests") {
 			continue
 		}
@@ -75,12 +74,18 @@ func (i *pythonIndexer) IndexDir(ctx context.Context, dir string) (*schema.Index
 		// Inspect the root node.
 		n := tree.RootNode()
 
-		// Package clauses
-		var pkgName string
+		// Module clauses
+		var modName string
 		{
 			query, err := sitter.NewQuery([]byte(`
 			(
-				(module . (comment)* . (expression_statement . (string) @package_docs)?)
+				module
+				.
+				(comment)*
+				.
+				(expression_statement .
+					(string) @module_docs
+				)?
 			)
 			`), python.GetLanguage())
 			if err != nil {
@@ -99,26 +104,20 @@ func (i *pythonIndexer) IndexDir(ctx context.Context, dir string) (*schema.Index
 				}
 				captures := getCaptures(query, match)
 
-				// Extract package docs and Strip """ from both sides.
-				pkgDocs := joinCaptures(content, captures["package_docs"], "\n")
-				pkgDocs = sanitizeDocs(pkgDocs)
-				pkgName = strings.ReplaceAll(strings.TrimSuffix(path, ".py"), "/", ".")
+				// Extract module docs and Strip """ from both sides.
+				modDocs := joinCaptures(content, captures["module_docs"], "\n")
+				modDocs = sanitizeDocs(modDocs)
+				modName = strings.ReplaceAll(strings.TrimSuffix(path, ".py"), "/", ".")
 
-				if existing, ok := packages[pkgName]; ok {
-					if pkgDocs != "" {
-						existing.docs += "\n\n"
-						existing.docs += pkgDocs
-					}
-					packages[pkgName] = existing
-				} else {
-					packages[pkgName] = packageInfo{path: path, docs: pkgDocs}
-				}
+				mods[modName] = moduleInfo{path: path, docs: modDocs}
 			}
 		}
 
 		// Function definitions
 		{
 			query, err := sitter.NewQuery([]byte(`
+			(
+				module
 				(
 				function_definition
 					name: (identifier) @func_name
@@ -126,6 +125,7 @@ func (i *pythonIndexer) IndexDir(ctx context.Context, dir string) (*schema.Index
 					return_type: (type)? @func_result
 					body: (block . (expression_statement (string) @func_docs)?)
 				)
+			)
 			`), python.GetLanguage())
 			if err != nil {
 				return nil, errors.Wrap(err, "NewQuery")
@@ -157,32 +157,32 @@ func (i *pythonIndexer) IndexDir(ctx context.Context, dir string) (*schema.Index
 				if funcResult != "" {
 					funcLabel = funcLabel + schema.Markdown(" -> "+funcResult)
 				}
-				funcs := functionsByPackage[pkgName]
+				funcs := functionsByMod[modName]
 				funcs = append(funcs, schema.Section{
 					ID:         funcName,
 					ShortLabel: funcName,
 					Label:      funcLabel,
 					Detail:     schema.Markdown(funcDocs),
 				})
-				functionsByPackage[pkgName] = funcs
+				functionsByMod[modName] = funcs
 			}
 		}
 	}
 
 	var pages []schema.Page
-	for pkgName, pkgInfo := range packages {
+	for modName, moduleInfo := range mods {
 		functionsSection := schema.Section{
 			ID:         "func",
 			ShortLabel: "func",
 			Label:      "Functions",
 			Category:   true,
-			Children:   functionsByPackage[pkgName],
+			Children:   functionsByMod[modName],
 		}
 
 		pages = append(pages, schema.Page{
-			Path:     pkgInfo.path,
-			Title:    "Package " + pkgName,
-			Detail:   schema.Markdown(pkgInfo.docs),
+			Path:     moduleInfo.path,
+			Title:    "Module " + modName,
+			Detail:   schema.Markdown(moduleInfo.docs),
 			Sections: []schema.Section{functionsSection},
 		})
 	}
@@ -206,11 +206,10 @@ func (i *pythonIndexer) IndexDir(ctx context.Context, dir string) (*schema.Index
 }
 
 func sanitizeDocs(s string) string {
-	// TODO: Better rendering of python doctests?
 	return strings.TrimSuffix(strings.TrimPrefix(s, "\"\"\""), "\"\"\"")
 }
 
-type packageInfo struct {
+type moduleInfo struct {
 	path string
 	docs string
 }

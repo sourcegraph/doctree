@@ -45,7 +45,7 @@ tasks:
       - ./frontend/src/**/*.elm
     generates:
       - .elm-spa/**/*
-      - public/dist/elm.js
+      - ./frontend/public/dist/elm.js
 
   build-elm-release:
     desc: Build Elm frontend code (release mode, minified, etc.)
@@ -58,7 +58,7 @@ tasks:
       - ./frontend/src/**/*.elm
     generates:
       - .elm-spa/**/*
-      - public/dist/elm.js
+      - ./frontend/public/dist/elm.js
 
   build-go-debug:
     desc: Build .bin/doctree (debug)

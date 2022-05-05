@@ -1,15 +1,16 @@
 module ProjectPage exposing (Model, Msg, init, page, subscriptions, update, view)
 
-import Dict
+import Dict exposing (keys)
 import Effect exposing (Effect)
 import Element as E
-import Element.Background as Background
 import Element.Border as Border
 import Element.Font as Font
 import Element.Region as Region
 import Gen.Params.NotFound exposing (Params)
 import Html exposing (Html)
 import Html.Attributes exposing (style)
+import Markdown.Parser as Markdown
+import Markdown.Renderer
 import Page
 import Request
 import Schema
@@ -18,7 +19,6 @@ import Style
 import Url.Builder
 import Util exposing (httpErrorToString)
 import View exposing (View)
-import Dict exposing (keys)
 
 
 page : Shared.Model -> Request.With Params -> Page.With Model Msg
@@ -184,13 +184,19 @@ viewName model projectIndexes projectName =
 
 viewNameLanguage : Model -> Schema.ProjectIndexes -> String -> String -> Html Msg
 viewNameLanguage model projectIndexes projectName language =
-    let firstLanguage = Maybe.withDefault "" (List.head (keys(projectIndexes)))
-        selectedLanguage = 
+    let
+        firstLanguage =
+            Maybe.withDefault "" (List.head (keys projectIndexes))
+
+        selectedLanguage =
             if language == "" then
                 firstLanguage
+
             else
                 language
-        indexLookup = Dict.get selectedLanguage projectIndexes
+
+        indexLookup =
+            Dict.get selectedLanguage projectIndexes
     in
     case indexLookup of
         Just index ->
@@ -347,8 +353,29 @@ logoTiny =
 
 
 renderMarkdown markdown =
-    E.textColumn []
-        (List.map
-            (\paragraph -> E.paragraph [ E.paddingXY 0 4 ] [ E.text paragraph ])
-            (String.split "\n" markdown)
-        )
+    if False then
+        -- DEBUG: Render Markdown as plain text for debugging.
+        E.textColumn []
+            (List.map
+                (\paragraph -> E.paragraph [ E.paddingXY 0 4 ] [ E.text paragraph ])
+                (String.split "\n" markdown)
+            )
+
+    else
+        case
+            markdown
+                |> Markdown.parse
+                |> Result.mapError deadEndsToString
+                |> Result.andThen (\ast -> Markdown.Renderer.render Markdown.Renderer.defaultHtmlRenderer ast)
+        of
+            Ok rendered ->
+                E.column [ maxWidth, E.htmlAttribute (Html.Attributes.style "white-space" "normal") ] (List.map (\e -> E.html e) rendered)
+
+            Err errors ->
+                E.text errors
+
+
+deadEndsToString deadEnds =
+    deadEnds
+        |> List.map Markdown.deadEndToString
+        |> String.join "\n"

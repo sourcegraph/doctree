@@ -27,7 +27,7 @@ render markdown =
                 |> Result.andThen (\ast -> Markdown.Renderer.render Markdown.Renderer.defaultHtmlRenderer ast)
         of
             Ok rendered ->
-                E.column [ E.htmlAttribute (Html.Attributes.style "white-space" "normal") ] (List.map (\e -> E.html e) rendered)
+                E.column [ E.htmlAttribute (Html.Attributes.class "markdown") ] (List.map (\e -> E.html e) rendered)
 
             Err errors ->
                 E.text errors

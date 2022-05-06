@@ -54,6 +54,7 @@ var (
 	LanguagePython     = Language{Title: "Python", ID: "python"}
 	LanguageTypeScript = Language{Title: "TypeScript", ID: "typescript"}
 	LanguageZig        = Language{Title: "Zig", ID: "zig"}
+	LanguageMarkdown   = Language{Title: "Markdown", ID: "markdown"}
 )
 
 // Library documentation, represents a code library / a logical unit of code typically distributed

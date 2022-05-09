@@ -4,10 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"path/filepath"
-	"time"
 
-	"github.com/hashicorp/go-multierror"
 	"github.com/hexops/cmder"
 	"github.com/pkg/errors"
 
@@ -22,16 +19,15 @@ func init() {
 	const usage = `
 Examples:
 
-  Index all code in the current directory:
+  Search :
 
-    $ doctree index .
+    $ doctree search 'myquery'
 
 `
 
 	// Parse flags for our subcommand.
-	flagSet := flag.NewFlagSet("index", flag.ExitOnError)
+	flagSet := flag.NewFlagSet("search", flag.ExitOnError)
 	dataDirFlag := flagSet.String("data-dir", defaultDataDir(), "where doctree stores its data")
-	projectFlag := flagSet.String("project", defaultProjectName(), "name of the project")
 
 	// Handles calls to our subcommand.
 	handler := func(args []string) error {
@@ -39,28 +35,16 @@ Examples:
 		if flagSet.NArg() != 1 {
 			return &cmder.UsageError{}
 		}
-		dir := flagSet.Arg(0)
+		query := flagSet.Arg(0)
 
 		ctx := context.Background()
-		indexes, indexErr := indexer.IndexDir(ctx, dir)
-		for _, index := range indexes {
-			fmt.Printf("%v: indexed %v files (%v bytes) in %v\n", index.Language.ID, index.NumFiles, index.NumBytes, time.Duration(index.DurationSeconds*float64(time.Second)).Round(time.Millisecond))
-		}
-
-		err := indexer.IndexForSearch(*projectFlag, indexes)
+		_ = dataDirFlag
+		_ = ctx
+		_, err := indexer.Search(query)
 		if err != nil {
-			return errors.Wrap(err, "IndexForSearch")
+			return errors.Wrap(err, "Search")
 		}
-
-		indexDataDir := filepath.Join(*dataDirFlag, "index")
-		writeErr := indexer.WriteIndexes(*projectFlag, indexDataDir, indexes)
-		if indexErr != nil && writeErr != nil {
-			return multierror.Append(indexErr, writeErr)
-		}
-		if indexErr != nil {
-			return indexErr
-		}
-		return writeErr
+		return nil
 	}
 
 	// Register the command.

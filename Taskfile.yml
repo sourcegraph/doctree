@@ -64,22 +64,42 @@ tasks:
     desc: Build .bin/doctree (debug)
     cmds:
       - mkdir -p .bin
-      - go build -o .bin/doctree ./cmd/doctree
+      - go build -a -ldflags "-w" -o .bin/doctree ./cmd/doctree
     sources:
       - ./**/*.go
+      - libs/sinter/**/*.zig
     generates:
       - .bin/doctree
+    deps:
+      - task: build-zig-debug
 
   build-go-release:
     desc: Build .bin/doctree (release)
     cmds:
       - mkdir -p .bin
-      - go build -o .bin/doctree ./cmd/doctree
+      - go build -a -o .bin/doctree ./cmd/doctree
     sources:
       - ./**/*.go
       - ./frontend/public/**
+      - libs/sinter/**/*.zig
     generates:
       - .bin/doctree
+    deps:
+      - task: build-zig-release
+
+  build-zig-debug:
+    desc: Build Zig code in debug mode
+    cmds:
+      - cd libs/sinter && zig build
+    sources:
+      - libs/sinter/**/*.zig
+
+  build-zig-release:
+    desc: Build Zig code in release mode
+    cmds:
+      - cd libs/sinter && zig build -Drelease-fast=true
+    sources:
+      - libs/sinter/**/*.zig
 
   test:
     desc: Run all tests
@@ -117,11 +137,12 @@ tasks:
     deps:
       - build-tools
 
-  install-frontend-deps:
-    desc: Install frontend dependencies
-    dir: frontend
+  setup:
+    desc: Install dependencies, pull submodules
     cmds:
-      - npm install
+      - git submodule update --init --recursive
+      - rm libs/sinter/bindings/sinter-go/go.mod
+      - cd frontend && npm install
 
   build-tools:
     desc: Build tool dependencies (golangci-lint, etc.)

@@ -1,8 +1,13 @@
 package indexer
 
 import (
+	"context"
 	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/sourcegraph/doctree/doctree/schema"
@@ -10,8 +15,11 @@ import (
 	"github.com/spaolacci/murmur3"
 )
 
-// IndexForSearch produces search indexes for the given project.
-func IndexForSearch(projectName string, indexes map[string]*schema.Index) error {
+// IndexForSearch produces search indexes for the given project, writing them to:
+//
+// index/<project_name>/search-index.sinter
+func IndexForSearch(projectName, indexDataDir string, indexes map[string]*schema.Index) error {
+	start := time.Now()
 	filter, err := sinter.FilterInit(10_000_000)
 	if err != nil {
 		return errors.Wrap(err, "FilterInit")
@@ -61,36 +69,70 @@ func IndexForSearch(projectName string, indexes map[string]*schema.Index) error 
 		}
 	}
 
-	fmt.Printf("search: indexing %v filter keys (%v search keys)\n", totalNumKeys, totalNumSearchKeys)
 	if err := filter.Index(); err != nil {
 		return errors.Wrap(err, "Index")
 	}
 
-	if err := filter.WriteFile("out.sinter"); err != nil {
+	indexDataDir, err = filepath.Abs(indexDataDir)
+	if err != nil {
+		return errors.Wrap(err, "Abs")
+	}
+	outDir := filepath.Join(indexDataDir, encodeProjectName(projectName))
+	if err := os.MkdirAll(outDir, os.ModePerm); err != nil {
+		return errors.Wrap(err, "MkdirAll")
+	}
+
+	if err := filter.WriteFile(filepath.Join(outDir, "search-index.sinter")); err != nil {
 		return errors.Wrap(err, "WriteFile")
 	}
+	// TODO: This should be in cmd/doctree, not here.
+	fmt.Printf("search: indexed %v filter keys (%v search keys) in %v\n", totalNumKeys, totalNumSearchKeys, time.Since(start))
 
 	return nil
 }
 
-func Search(query string) ([]Result, error) {
-	// TODO: return stats about search performance, etc.
-	// t := time.Now()
-	sinterFilter, err := sinter.FilterReadFile("/Users/slimsag/go/sourcegraph/out.sinter")
-	if err != nil {
-		return nil, errors.Wrap(err, "FilterReadFile")
+func Search(ctx context.Context, indexDataDir, query string) ([]Result, error) {
+	dir, err := ioutil.ReadDir(indexDataDir)
+	if os.IsNotExist(err) {
+		return []Result{}, nil
 	}
-	// fmt.Println("read file:", time.Since(t))
-	// t = time.Now()
+	if err != nil {
+		return nil, errors.Wrap(err, "ReadDir")
+	}
+	var indexes []string
+	for _, info := range dir {
+		if info.IsDir() {
+			indexes = append(indexes, filepath.Join(indexDataDir, info.Name(), "search-index.sinter"))
+		}
+	}
 
-	// TODO: query limiting
-	results, err := sinterFilter.QueryLogicalOr([]uint64{hash(query)})
-	if err != nil {
-		return nil, errors.Wrap(err, "QueryLogicalOr")
+	// TODO: return stats about search performance, etc.
+	// TODO: query limiting support
+	// TODO: support filtering to specific project
+	const limit = 100
+	outResults := []Result{}
+	totalKeys := 0
+	for _, sinterFile := range indexes {
+		sinterFilter, err := sinter.FilterReadFile(sinterFile)
+		if err != nil {
+			return nil, errors.Wrap(err, "FilterReadFile: "+sinterFile)
+		}
+
+		results, err := sinterFilter.QueryLogicalOr([]uint64{hash(query)})
+		if err != nil {
+			return nil, errors.Wrap(err, "QueryLogicalOr")
+		}
+		defer results.Deinit()
+
+		outResults = append(outResults, decodeResults(results, query, limit)...)
+		for _, r := range outResults {
+			totalKeys += len(r.Keys)
+		}
+		if totalKeys > limit {
+			break
+		}
 	}
-	defer results.Deinit()
-	// fmt.Println("found", results.Len(), "in", time.Since(t), "for query:", query)
-	return Results(results, query), nil
+	return outResults, nil
 }
 
 type Result struct {
@@ -98,7 +140,7 @@ type Result struct {
 	Keys []string `json:"keys"`
 }
 
-func Results(results sinter.FilterResults, query string) []Result {
+func decodeResults(results sinter.FilterResults, query string, limitKeys int) []Result {
 	var out []Result
 	totalKeys := 0
 	for i := 0; i < results.Len(); i++ {
@@ -115,9 +157,7 @@ func Results(results sinter.FilterResults, query string) []Result {
 			out = append(out, Result{Path: path, Keys: outKeys})
 			totalKeys += len(outKeys)
 		}
-		if totalKeys > 100 {
-			// TODO: limiting to 100 results here for now so frontend is not overloaded with
-			// rendering.
+		if totalKeys > limitKeys {
 			break
 		}
 	}

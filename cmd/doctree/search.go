@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"path/filepath"
 
 	"github.com/hexops/cmder"
 	"github.com/pkg/errors"
@@ -38,9 +39,8 @@ Examples:
 		query := flagSet.Arg(0)
 
 		ctx := context.Background()
-		_ = dataDirFlag
-		_ = ctx
-		_, err := indexer.Search(query)
+		indexDataDir := filepath.Join(*dataDirFlag, "index")
+		_, err := indexer.Search(ctx, indexDataDir, query)
 		if err != nil {
 			return errors.Wrap(err, "Search")
 		}

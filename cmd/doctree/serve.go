@@ -112,12 +112,9 @@ func Serve(addr, indexDataDir string) error {
 		w.Header().Set("Content-Type", "application/json")
 
 		query := r.URL.Query().Get("query")
-		results, err := indexer.Search(query)
+		results, err := indexer.Search(r.Context(), indexDataDir, query)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
-		if results == nil {
-			results = []indexer.Result{}
 		}
 
 		b, err := json.Marshal(results)

@@ -47,11 +47,6 @@ Examples:
 			fmt.Printf("%v: indexed %v files (%v bytes) in %v\n", index.Language.ID, index.NumFiles, index.NumBytes, time.Duration(index.DurationSeconds*float64(time.Second)).Round(time.Millisecond))
 		}
 
-		err := indexer.IndexForSearch(*projectFlag, indexes)
-		if err != nil {
-			return errors.Wrap(err, "IndexForSearch")
-		}
-
 		indexDataDir := filepath.Join(*dataDirFlag, "index")
 		writeErr := indexer.WriteIndexes(*projectFlag, indexDataDir, indexes)
 		if indexErr != nil && writeErr != nil {
@@ -60,7 +55,15 @@ Examples:
 		if indexErr != nil {
 			return indexErr
 		}
-		return writeErr
+		if writeErr != nil {
+			return writeErr
+		}
+
+		err := indexer.IndexForSearch(*projectFlag, indexDataDir, indexes)
+		if err != nil {
+			return errors.Wrap(err, "IndexForSearch")
+		}
+		return nil
 	}
 
 	// Register the command.

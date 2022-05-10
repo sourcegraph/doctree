@@ -3,8 +3,6 @@ module Style exposing (..)
 import Element as E
 import Element.Font as Font
 import Element.Region as Region
-import Html
-import Html.Attributes
 
 
 font =

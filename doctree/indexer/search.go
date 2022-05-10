@@ -27,9 +27,12 @@ func IndexForSearch(projectName, indexDataDir string, indexes map[string]*schema
 	defer filter.Deinit()
 
 	walkPage := func(language string, lib schema.Library, p schema.Page, keys []string) []string {
+		key := language + " /-/ " + projectName + " /-/ " + strings.Join(p.SearchKey, "")
+		keys = append(keys, key)
+
 		var walkSection func(s schema.Section)
 		walkSection = func(s schema.Section) {
-			key := language + " / " + lib.Name + " / " + p.Title + " / " + s.ShortLabel
+			key := language + " /-/ " + projectName + " /-/ " + strings.Join(s.SearchKey, "")
 			keys = append(keys, key)
 
 			for _, child := range s.Children {
@@ -184,6 +187,10 @@ func match(query, key string) bool {
 	return false
 }
 
+// TODO: should not be exported, and should take into account language preferences (important
+// punctuation list that is language-specific)
+//
+// TODO: "http.Ge" doesn't match right now, while "http.Get" does. Why?
 func FuzzyKeys(keys []string) []uint64 {
 	var fuzzyKeys []uint64
 	for _, whole := range keys {

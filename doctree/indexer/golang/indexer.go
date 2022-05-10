@@ -173,6 +173,7 @@ func (i *goIndexer) IndexDir(ctx context.Context, dir string) (*schema.Index, er
 					ShortLabel: funcName,
 					Label:      funcLabel,
 					Detail:     schema.Markdown(funcDocs),
+					SearchKey:  []string{pkgName, ".", funcName},
 				})
 				functionsByPackage[pkgName] = funcs
 			}
@@ -186,14 +187,16 @@ func (i *goIndexer) IndexDir(ctx context.Context, dir string) (*schema.Index, er
 			ShortLabel: "func",
 			Label:      "Functions",
 			Category:   true,
+			SearchKey:  []string{},
 			Children:   functionsByPackage[pkgName],
 		}
 
 		pages = append(pages, schema.Page{
-			Path:     pkgInfo.path,
-			Title:    "Package " + pkgName,
-			Detail:   schema.Markdown(pkgInfo.docs),
-			Sections: []schema.Section{functionsSection},
+			Path:      pkgInfo.path,
+			Title:     "Package " + pkgName,
+			Detail:    schema.Markdown(pkgInfo.docs),
+			SearchKey: []string{pkgName},
+			Sections:  []schema.Section{functionsSection},
 		})
 	}
 

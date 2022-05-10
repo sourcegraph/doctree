@@ -1,5 +1,6 @@
 module ProjectPage exposing (Model, Msg, init, page, subscriptions, update, view)
 
+import APISchema
 import Dict exposing (keys)
 import Effect exposing (Effect)
 import Element as E
@@ -163,7 +164,7 @@ view shared projectURI model =
     }
 
 
-viewName : Model -> Schema.ProjectIndexes -> String -> Html Msg
+viewName : Model -> APISchema.ProjectIndexes -> String -> Html Msg
 viewName model projectIndexes projectName =
     E.layout Style.layout
         (E.column []
@@ -181,7 +182,7 @@ viewName model projectIndexes projectName =
         )
 
 
-viewNameLanguage : Model -> Schema.ProjectIndexes -> String -> String -> Html Msg
+viewNameLanguage : Model -> APISchema.ProjectIndexes -> String -> String -> Html Msg
 viewNameLanguage model projectIndexes projectName language =
     let
         firstLanguage =
@@ -246,7 +247,7 @@ viewNameLanguage model projectIndexes projectName language =
             E.layout Style.layout (E.text "language not found")
 
 
-viewNameLanguagePage : Model -> Schema.ProjectIndexes -> String -> String -> String -> Html Msg
+viewNameLanguagePage : Model -> APISchema.ProjectIndexes -> String -> String -> String -> Html Msg
 viewNameLanguagePage model projectIndexes projectName language targetPagePath =
     let
         pageLookup =

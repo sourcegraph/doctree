@@ -1,34 +1,7 @@
 module Schema exposing (..)
 
-import Dict exposing (Dict)
 import Json.Decode as Decode exposing (Decoder)
 import Json.Decode.Pipeline as Pipeline
-
-
-
--- decoder for: /api/list
-
-
-type alias ProjectList =
-    List String
-
-
-projectListDecoder : Decoder ProjectList
-projectListDecoder =
-    Decode.list Decode.string
-
-
-
--- decoder for: /api/get?name=github.com/sourcegraph/sourcegraph
-
-
-type alias ProjectIndexes =
-    Dict String Index
-
-
-projectIndexesDecoder : Decoder ProjectIndexes
-projectIndexesDecoder =
-    Decode.dict indexDecoder
 
 
 indexDecoder : Decoder Index

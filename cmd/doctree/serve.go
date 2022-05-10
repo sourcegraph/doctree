@@ -105,6 +105,31 @@ func Serve(addr, indexDataDir string) error {
 			return
 		}
 	}))
+	mux.Handle("/api/search", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// SECURITY: This endpoint isn't mutable and doesn't serve privileged information, and
+		// therefor safe to use from any origin.
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Content-Type", "application/json")
+
+		query := r.URL.Query().Get("query")
+		results, err := indexer.Search(query)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+		if results == nil {
+			results = []indexer.Result{}
+		}
+
+		b, err := json.Marshal(results)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		_, err = w.Write(b)
+		if err != nil {
+			return
+		}
+	}))
 	muxWithGzip := gziphandler.GzipHandler(mux)
 	if err := http.ListenAndServe(addr, muxWithGzip); err != nil {
 		return errors.Wrap(err, "ListenAndServe")

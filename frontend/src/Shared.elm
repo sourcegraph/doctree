@@ -7,10 +7,10 @@ module Shared exposing
     , update
     )
 
+import APISchema
 import Http
 import Json.Decode as Json
 import Request exposing (Request)
-import Schema
 import Url.Builder
 
 
@@ -20,13 +20,13 @@ type alias Flags =
 
 type alias Model =
     { currentProjectName : Maybe String
-    , projectIndexes : Maybe (Result Http.Error Schema.ProjectIndexes)
+    , projectIndexes : Maybe (Result Http.Error APISchema.ProjectIndexes)
     }
 
 
 type Msg
     = GetProject String
-    | GotProject (Result Http.Error Schema.ProjectIndexes)
+    | GotProject (Result Http.Error APISchema.ProjectIndexes)
 
 
 init : Request -> Flags -> ( Model, Cmd Msg )
@@ -56,7 +56,7 @@ update _ msg model =
                 ( { model | currentProjectName = Just projectName }
                 , Http.get
                     { url = Url.Builder.absolute [ "api", "get" ] [ Url.Builder.string "name" projectName ]
-                    , expect = Http.expectJson GotProject Schema.projectIndexesDecoder
+                    , expect = Http.expectJson GotProject APISchema.projectIndexesDecoder
                     }
                 )
                 -- Loaded already

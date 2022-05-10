@@ -3,7 +3,6 @@ package indexer
 import (
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/pkg/errors"
 	"github.com/sourcegraph/doctree/doctree/schema"
@@ -74,14 +73,15 @@ func IndexForSearch(projectName string, indexes map[string]*schema.Index) error 
 	return nil
 }
 
-func Search(query string) ([]string, error) {
-	t := time.Now()
-	sinterFilter, err := sinter.FilterReadFile("out.sinter")
+func Search(query string) ([]Result, error) {
+	// TODO: return stats about search performance, etc.
+	// t := time.Now()
+	sinterFilter, err := sinter.FilterReadFile("/Users/slimsag/go/sourcegraph/out.sinter")
 	if err != nil {
 		return nil, errors.Wrap(err, "FilterReadFile")
 	}
-	fmt.Println("read file:", time.Since(t))
-	t = time.Now()
+	// fmt.Println("read file:", time.Since(t))
+	// t = time.Now()
 
 	// TODO: query limiting
 	results, err := sinterFilter.QueryLogicalOr([]uint64{hash(query)})
@@ -89,23 +89,18 @@ func Search(query string) ([]string, error) {
 		return nil, errors.Wrap(err, "QueryLogicalOr")
 	}
 	defer results.Deinit()
-	fmt.Println("found", results.Len(), "in", time.Since(t))
-
-	for _, result := range Results(results, query) {
-		for _, key := range result.Keys {
-			fmt.Println(result.Path, "->", key)
-		}
-	}
-	return nil, nil
+	// fmt.Println("found", results.Len(), "in", time.Since(t), "for query:", query)
+	return Results(results, query), nil
 }
 
 type Result struct {
-	Path string
-	Keys []string
+	Path string   `json:"path"`
+	Keys []string `json:"keys"`
 }
 
 func Results(results sinter.FilterResults, query string) []Result {
 	var out []Result
+	totalKeys := 0
 	for i := 0; i < results.Len(); i++ {
 		lines := strings.Split(string(results.Index(i)), "\n")
 		path := lines[0]
@@ -116,7 +111,15 @@ func Results(results sinter.FilterResults, query string) []Result {
 				outKeys = append(outKeys, key)
 			}
 		}
-		out = append(out, Result{Path: path, Keys: outKeys})
+		if len(outKeys) > 0 {
+			out = append(out, Result{Path: path, Keys: outKeys})
+			totalKeys += len(outKeys)
+		}
+		if totalKeys > 100 {
+			// TODO: limiting to 100 results here for now so frontend is not overloaded with
+			// rendering.
+			break
+		}
 	}
 	return out
 }
@@ -130,10 +133,11 @@ func match(query, key string) bool {
 			return true
 		}
 		lowerQuery := strings.ToLower(query)
-		if strings.HasPrefix(part, lowerQuery) {
+		lowerPart := strings.ToLower(part)
+		if strings.HasPrefix(lowerPart, lowerQuery) {
 			return true
 		}
-		if strings.HasSuffix(part, lowerQuery) {
+		if strings.HasSuffix(lowerPart, lowerQuery) {
 			return true
 		}
 	}

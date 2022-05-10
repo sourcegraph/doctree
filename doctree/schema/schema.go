@@ -95,6 +95,18 @@ type Page struct {
 	// The detail
 	Detail Markdown `json:"detail"`
 
+	// SearchKey describes a single string a user would type in to a search bar to find this
+	// page. For example, in Go this might be "net/http"
+	//
+	// This is a list of strings to diffentiate the different "parts" of the string, for Go it would
+	// actually be ["net", "/", "http"]. The search engine will do fuzzy prefix/suffix matching of
+	// each *part* of the key. For example, a query for "net" would be treated as "*net*".
+	//
+	// The key should aim to be unique within the scope of the directory and language that was
+	// indexed (you can imagine the key is prefixed with the language name and directory/repository
+	// name for you.)
+	SearchKey []string `json:"searchKey"`
+
 	// Sections on the page.
 	Sections []Section `json:"sections"`
 
@@ -135,6 +147,19 @@ type Section struct {
 
 	// The detail
 	Detail Markdown `json:"detail"`
+
+	// SearchKey describes a single string a user would type in to a search bar to find this
+	// section. For example, in Go this might be "net/http.Client.PostForm"
+	//
+	// This is a list of strings to diffentiate the different "parts" of the string, for Go it would
+	// actually be ["net", "/", "http", ".", "Client", ".", "PostForm"]. The search engine will do
+	// fuzzy prefix/suffix matching of each *part* of the key. For example, a query for
+	// "net.PostForm" would be treated as "*net*.*PostForm*".
+	//
+	// The key should aim to be unique within the scope of the directory and language that was
+	// indexed (you can imagine the key is prefixed with the language name and directory/repository
+	// name for you.)
+	SearchKey []string `json:"searchKey"`
 
 	// Any children sections. For example, if this section represents a class the children could be
 	// the methods of the class and they would be rendered immediately below this section and

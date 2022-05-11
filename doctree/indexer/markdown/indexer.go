@@ -54,10 +54,11 @@ func (i *markdownIndexer) IndexDir(ctx context.Context, dir string) (*schema.Ind
 		bytes += len(content)
 
 		pages = append(pages, schema.Page{
-			Path:     path,
-			Title:    path,
-			Detail:   schema.Markdown(content),
-			Sections: []schema.Section{},
+			Path:      path,
+			Title:     path,
+			Detail:    schema.Markdown(content),
+			SearchKey: []string{},
+			Sections:  []schema.Section{},
 		})
 	}
 

@@ -1,7 +1,9 @@
 package indexer
 
 import (
+	"bytes"
 	"context"
+	"encoding/gob"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -26,14 +28,12 @@ func IndexForSearch(projectName, indexDataDir string, indexes map[string]*schema
 	}
 	defer filter.Deinit()
 
-	walkPage := func(language string, lib schema.Library, p schema.Page, keys []string) []string {
-		key := language + " /-/ " + projectName + " /-/ " + strings.Join(p.SearchKey, "")
-		keys = append(keys, key)
+	walkPage := func(p schema.Page, keys []string) []string {
+		keys = append(keys, strings.Join(p.SearchKey, ""))
 
 		var walkSection func(s schema.Section)
 		walkSection = func(s schema.Section) {
-			key := language + " /-/ " + projectName + " /-/ " + strings.Join(s.SearchKey, "")
-			keys = append(keys, key)
+			keys = append(keys, strings.Join(s.SearchKey, ""))
 
 			for _, child := range s.Children {
 				walkSection(child)
@@ -47,11 +47,28 @@ func IndexForSearch(projectName, indexDataDir string, indexes map[string]*schema
 
 	totalNumKeys := 0
 	totalNumSearchKeys := 0
-	insert := func(pagePath string, keys []string) error {
-		totalNumSearchKeys += len(keys)
-		fuzzyKeys := FuzzyKeys(keys)
+	insert := func(language, projectName, pagePath string, searchKeys []string) error {
+		absoluteKeys := make([]string, 0, len(searchKeys))
+		for _, searchKey := range searchKeys {
+			absoluteKeys = append(absoluteKeys, absoluteKey(language, projectName, searchKey))
+		}
+
+		totalNumSearchKeys += len(searchKeys)
+		fuzzyKeys := FuzzyKeys(absoluteKeys)
 		totalNumKeys += len(fuzzyKeys)
-		if err := filter.Insert(&sinter.SliceIterator{Slice: fuzzyKeys}, []byte(pagePath+"\n\n"+strings.Join(keys, "\n")+"\n\n")); err != nil {
+
+		var buf bytes.Buffer
+		enc := gob.NewEncoder(&buf)
+		if err := enc.Encode(sinterResult{
+			Language:    language,
+			ProjectName: projectName,
+			SearchKeys:  searchKeys,
+			Path:        pagePath,
+		}); err != nil {
+			return errors.Wrap(err, "Encode")
+		}
+
+		if err := filter.Insert(&sinter.SliceIterator{Slice: fuzzyKeys}, buf.Bytes()); err != nil {
 			return errors.Wrap(err, "Insert")
 		}
 		return nil
@@ -60,11 +77,11 @@ func IndexForSearch(projectName, indexDataDir string, indexes map[string]*schema
 	for language, index := range indexes {
 		for _, lib := range index.Libraries {
 			for _, page := range lib.Pages {
-				if err := insert(page.Path, walkPage(language, lib, page, nil)); err != nil {
+				if err := insert(language, projectName, page.Path, walkPage(page, nil)); err != nil {
 					return err
 				}
 				for _, subPage := range page.Subpages {
-					if err := insert(page.Path, walkPage(language, lib, subPage, nil)); err != nil {
+					if err := insert(language, projectName, page.Path, walkPage(subPage, nil)); err != nil {
 						return err
 					}
 				}
@@ -94,6 +111,10 @@ func IndexForSearch(projectName, indexDataDir string, indexes map[string]*schema
 	return nil
 }
 
+func absoluteKey(language, projectName, searchKey string) string {
+	return strings.Join([]string{language, projectName, searchKey}, " /-/ ")
+}
+
 func Search(ctx context.Context, indexDataDir, query string) ([]Result, error) {
 	dir, err := ioutil.ReadDir(indexDataDir)
 	if os.IsNotExist(err) {
@@ -113,8 +134,7 @@ func Search(ctx context.Context, indexDataDir, query string) ([]Result, error) {
 	// TODO: query limiting support
 	// TODO: support filtering to specific project
 	const limit = 100
-	outResults := []Result{}
-	totalKeys := 0
+	out := []Result{}
 	for _, sinterFile := range indexes {
 		sinterFilter, err := sinter.FilterReadFile(sinterFile)
 		if err != nil {
@@ -127,41 +147,50 @@ func Search(ctx context.Context, indexDataDir, query string) ([]Result, error) {
 		}
 		defer results.Deinit()
 
-		outResults = append(outResults, decodeResults(results, query, limit)...)
-		for _, r := range outResults {
-			totalKeys += len(r.Keys)
-		}
-		if totalKeys > limit {
+		out = append(out, decodeResults(results, query, limit-len(out))...)
+		if len(out) >= limit {
 			break
 		}
 	}
-	return outResults, nil
+	return out, nil
 }
 
 type Result struct {
-	Path string   `json:"path"`
-	Keys []string `json:"keys"`
+	Language    string `json:"language"`
+	ProjectName string `json:"projectName"`
+	SearchKey   string `json:"searchKey"`
+	Path        string `json:"path"`
 }
 
-func decodeResults(results sinter.FilterResults, query string, limitKeys int) []Result {
+type sinterResult struct {
+	Language    string   `json:"language"`
+	ProjectName string   `json:"projectName"`
+	SearchKeys  []string `json:"searchKeys"`
+	Path        string   `json:"path"`
+}
+
+func decodeResults(results sinter.FilterResults, query string, limit int) []Result {
 	var out []Result
-	totalKeys := 0
+decoding:
 	for i := 0; i < results.Len(); i++ {
-		lines := strings.Split(string(results.Index(i)), "\n")
-		path := lines[0]
-		keys := lines[2:]
-		var outKeys []string
-		for _, key := range keys {
-			if match(query, key) {
-				outKeys = append(outKeys, key)
+		var result sinterResult
+		err := gob.NewDecoder(bytes.NewReader(results.Index(i))).Decode(&result)
+		if err != nil {
+			panic("illegal sinter result value: " + err.Error())
+		}
+
+		for _, searchKey := range result.SearchKeys {
+			if match(query, absoluteKey(result.Language, result.ProjectName, searchKey)) {
+				out = append(out, Result{
+					Language:    result.Language,
+					ProjectName: result.ProjectName,
+					SearchKey:   searchKey,
+					Path:        result.Path,
+				})
+				if len(out) >= limit {
+					break decoding
+				}
 			}
-		}
-		if len(outKeys) > 0 {
-			out = append(out, Result{Path: path, Keys: outKeys})
-			totalKeys += len(outKeys)
-		}
-		if totalKeys > limitKeys {
-			break
 		}
 	}
 	return out

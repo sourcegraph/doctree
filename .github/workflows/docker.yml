@@ -18,7 +18,7 @@ jobs:
         uses: arduino/setup-task@v1
       - name: Build Docker image
         run: |
-          task install-frontend-deps
+          task setup
           task build-image
       - name: Record latest release version
         id: recorded_release_version

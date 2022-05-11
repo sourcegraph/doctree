@@ -8,9 +8,11 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
+	"github.com/agnivade/levenshtein"
 	"github.com/pkg/errors"
 	"github.com/sourcegraph/doctree/doctree/schema"
 	sinter "github.com/sourcegraph/doctree/libs/sinter/bindings/sinter-go"
@@ -28,12 +30,12 @@ func IndexForSearch(projectName, indexDataDir string, indexes map[string]*schema
 	}
 	defer filter.Deinit()
 
-	walkPage := func(p schema.Page, keys []string) []string {
-		keys = append(keys, strings.Join(p.SearchKey, ""))
+	walkPage := func(p schema.Page, keys [][]string) [][]string {
+		keys = append(keys, p.SearchKey)
 
 		var walkSection func(s schema.Section)
 		walkSection = func(s schema.Section) {
-			keys = append(keys, strings.Join(s.SearchKey, ""))
+			keys = append(keys, s.SearchKey)
 
 			for _, child := range s.Children {
 				walkSection(child)
@@ -47,14 +49,14 @@ func IndexForSearch(projectName, indexDataDir string, indexes map[string]*schema
 
 	totalNumKeys := 0
 	totalNumSearchKeys := 0
-	insert := func(language, projectName, pagePath string, searchKeys []string) error {
-		absoluteKeys := make([]string, 0, len(searchKeys))
+	insert := func(language, projectName, pagePath string, searchKeys [][]string) error {
+		absoluteKeys := make([][]string, 0, len(searchKeys))
 		for _, searchKey := range searchKeys {
-			absoluteKeys = append(absoluteKeys, absoluteKey(language, projectName, searchKey))
+			absoluteKeys = append(absoluteKeys, append([]string{language, projectName}, searchKey...))
 		}
 
 		totalNumSearchKeys += len(searchKeys)
-		fuzzyKeys := FuzzyKeys(absoluteKeys)
+		fuzzyKeys := fuzzyKeys(absoluteKeys)
 		totalNumKeys += len(fuzzyKeys)
 
 		var buf bytes.Buffer
@@ -111,10 +113,6 @@ func IndexForSearch(projectName, indexDataDir string, indexes map[string]*schema
 	return nil
 }
 
-func absoluteKey(language, projectName, searchKey string) string {
-	return strings.Join([]string{language, projectName, searchKey}, " /-/ ")
-}
-
 func Search(ctx context.Context, indexDataDir, query string) ([]Result, error) {
 	dir, err := ioutil.ReadDir(indexDataDir)
 	if os.IsNotExist(err) {
@@ -133,6 +131,7 @@ func Search(ctx context.Context, indexDataDir, query string) ([]Result, error) {
 	// TODO: return stats about search performance, etc.
 	// TODO: query limiting support
 	// TODO: support filtering to specific project
+	const rankedResultLimit = 10000
 	const limit = 100
 	out := []Result{}
 	for _, sinterFile := range indexes {
@@ -141,35 +140,50 @@ func Search(ctx context.Context, indexDataDir, query string) ([]Result, error) {
 			return nil, errors.Wrap(err, "FilterReadFile: "+sinterFile)
 		}
 
-		results, err := sinterFilter.QueryLogicalOr([]uint64{hash(query)})
+		queryKey := strings.FieldsFunc(query, func(r rune) bool { return r == '.' || r == '/' })
+		queryKeyHashes := []uint64{}
+		for _, part := range queryKey {
+			queryKeyHashes = append(queryKeyHashes, hash(part))
+		}
+		if len(queryKeyHashes) == 0 {
+			// TODO: make QueryLogicalOr handle empty keys set
+			queryKeyHashes = []uint64{hash(query)}
+		}
+
+		results, err := sinterFilter.QueryLogicalOr(queryKeyHashes)
 		if err != nil {
 			return nil, errors.Wrap(err, "QueryLogicalOr")
 		}
 		defer results.Deinit()
 
-		out = append(out, decodeResults(results, query, limit-len(out))...)
-		if len(out) >= limit {
+		out = append(out, decodeResults(results, queryKey, rankedResultLimit-len(out))...)
+		if len(out) >= rankedResultLimit {
 			break
 		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Score > out[j].Score })
+	if len(out) > limit {
+		out = out[:limit]
 	}
 	return out, nil
 }
 
 type Result struct {
-	Language    string `json:"language"`
-	ProjectName string `json:"projectName"`
-	SearchKey   string `json:"searchKey"`
-	Path        string `json:"path"`
+	Language    string  `json:"language"`
+	ProjectName string  `json:"projectName"`
+	SearchKey   string  `json:"searchKey"`
+	Path        string  `json:"path"`
+	Score       float64 `json:"score"`
 }
 
 type sinterResult struct {
-	Language    string   `json:"language"`
-	ProjectName string   `json:"projectName"`
-	SearchKeys  []string `json:"searchKeys"`
-	Path        string   `json:"path"`
+	Language    string     `json:"language"`
+	ProjectName string     `json:"projectName"`
+	SearchKeys  [][]string `json:"searchKeys"`
+	Path        string     `json:"path"`
 }
 
-func decodeResults(results sinter.FilterResults, query string, limit int) []Result {
+func decodeResults(results sinter.FilterResults, queryKey []string, limit int) []Result {
 	var out []Result
 decoding:
 	for i := 0; i < results.Len(); i++ {
@@ -180,12 +194,15 @@ decoding:
 		}
 
 		for _, searchKey := range result.SearchKeys {
-			if match(query, absoluteKey(result.Language, result.ProjectName, searchKey)) {
+			absoluteKey := append([]string{result.Language, result.ProjectName}, searchKey...)
+			score := match(queryKey, absoluteKey)
+			if score > 0.5 {
 				out = append(out, Result{
 					Language:    result.Language,
 					ProjectName: result.ProjectName,
-					SearchKey:   searchKey,
+					SearchKey:   strings.Join(searchKey, ""),
 					Path:        result.Path,
+					Score:       score,
 				})
 				if len(out) >= limit {
 					break decoding
@@ -196,34 +213,38 @@ decoding:
 	return out
 }
 
-func match(query, key string) bool {
-	for _, part := range append([]string{key}, strings.Split(key, " / ")...) {
-		if strings.HasPrefix(part, query) {
-			return true
-		}
-		if strings.HasSuffix(part, query) {
-			return true
-		}
-		lowerQuery := strings.ToLower(query)
-		lowerPart := strings.ToLower(part)
-		if strings.HasPrefix(lowerPart, lowerQuery) {
-			return true
-		}
-		if strings.HasSuffix(lowerPart, lowerQuery) {
-			return true
+func match(queryKey []string, key []string) float64 {
+	matchThreshold := 0.75
+
+	score := 0.0
+	lastScore := 0.0
+	for _, queryPart := range queryKey {
+		queryPart = strings.ToLower(queryPart)
+		for i, keyPart := range key {
+			keyPart = strings.ToLower(keyPart)
+			largest := len(queryPart)
+			if len(keyPart) > largest {
+				largest = len(keyPart)
+			}
+			// [1.0, 0.0] where 1.0 is exactly equal
+			partScore := 1.0 - (float64(levenshtein.ComputeDistance(queryPart, keyPart)) / float64(largest))
+
+			boost := float64(len(key) - i) // Matches on left side of key get more boost
+			if partScore > matchThreshold && lastScore > matchThreshold {
+				boost *= 2
+			}
+			finalPartScore := partScore * boost
+			score += finalPartScore
+			lastScore = finalPartScore
 		}
 	}
-	return false
+	return score
 }
 
-// TODO: should not be exported, and should take into account language preferences (important
-// punctuation list that is language-specific)
-//
-// TODO: "http.Ge" doesn't match right now, while "http.Get" does. Why?
-func FuzzyKeys(keys []string) []uint64 {
+func fuzzyKeys(keys [][]string) []uint64 {
 	var fuzzyKeys []uint64
-	for _, whole := range keys {
-		for _, part := range append([]string{whole}, strings.Split(whole, " / ")...) {
+	for _, wholeKey := range keys {
+		for _, part := range wholeKey {
 			runes := []rune(part)
 			fuzzyKeys = append(fuzzyKeys, prefixKeys(runes)...)
 			fuzzyKeys = append(fuzzyKeys, suffixKeys(runes)...)

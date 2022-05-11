@@ -163,6 +163,7 @@ func (i *pythonIndexer) IndexDir(ctx context.Context, dir string) (*schema.Index
 					ShortLabel: funcName,
 					Label:      funcLabel,
 					Detail:     schema.Markdown(funcDocs),
+					SearchKey:  []string{modName, ".", funcName},
 				})
 				functionsByMod[modName] = funcs
 			}
@@ -175,15 +176,17 @@ func (i *pythonIndexer) IndexDir(ctx context.Context, dir string) (*schema.Index
 			ID:         "func",
 			ShortLabel: "func",
 			Label:      "Functions",
+			SearchKey:  []string{},
 			Category:   true,
 			Children:   functionsByMod[modName],
 		}
 
 		pages = append(pages, schema.Page{
-			Path:     moduleInfo.path,
-			Title:    "Module " + modName,
-			Detail:   schema.Markdown(moduleInfo.docs),
-			Sections: []schema.Section{functionsSection},
+			Path:      moduleInfo.path,
+			Title:     "Module " + modName,
+			Detail:    schema.Markdown(moduleInfo.docs),
+			SearchKey: []string{modName},
+			Sections:  []schema.Section{functionsSection},
 		})
 	}
 

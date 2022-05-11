@@ -14,7 +14,7 @@ brew install go-task/tap/go-task
 [Elm](https://elm-lang.org/) and [elm-spa](https://elm-spa.dev):
 
 ```sh
-task install-frontend-deps
+task setup
 ```
 
 *Note*: The frontend dependencies will be installed locally by `npm` in `frontend/`.

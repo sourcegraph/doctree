@@ -105,11 +105,15 @@ tasks:
     desc: Run all tests
     cmds:
       - go test ./...
+    deps:
+      - task: build-zig-debug
 
   test-race:
     desc: Run all tests (checking for race conditions, slow)
     cmds:
       - go test -race ./...
+    deps:
+      - task: build-zig-debug
 
   generate:
     desc: Produce generated code

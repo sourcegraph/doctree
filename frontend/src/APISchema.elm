@@ -39,11 +39,15 @@ projectIndexesDecoder =
 searchResultDecoder : Decoder SearchResult
 searchResultDecoder =
     Decode.succeed SearchResult
+        |> Pipeline.required "language" Decode.string
+        |> Pipeline.required "projectName" Decode.string
+        |> Pipeline.required "searchKey" Decode.string
         |> Pipeline.required "path" Decode.string
-        |> Pipeline.required "keys" (Decode.list Decode.string)
 
 
 type alias SearchResult =
-    { path : String
-    , keys : List String
+    { language : String
+    , projectName : String
+    , searchKey : String
+    , path : String
     }

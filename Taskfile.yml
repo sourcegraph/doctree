@@ -90,7 +90,7 @@ tasks:
   build-zig-debug:
     desc: Build Zig code in debug mode
     cmds:
-      - rm libs/sinter/bindings/sinter-go/go.mod
+      - rm -f libs/sinter/bindings/sinter-go/go.mod
       - cd libs/sinter && zig build
     sources:
       - libs/sinter/**/*.zig
@@ -98,7 +98,7 @@ tasks:
   build-zig-release:
     desc: Build Zig code in release mode
     cmds:
-      - rm libs/sinter/bindings/sinter-go/go.mod
+      - rm -f libs/sinter/bindings/sinter-go/go.mod
       - cd libs/sinter && zig build -Drelease-fast=true
     sources:
       - libs/sinter/**/*.zig
@@ -181,7 +181,7 @@ tasks:
   cc-x86_64-linux:
     desc: "Cross compile to x86_64-linux using Zig"
     cmds:
-      - rm libs/sinter/bindings/sinter-go/go.mod
+      - rm -f libs/sinter/bindings/sinter-go/go.mod
       - cd libs/sinter && zig build -Drelease-fast=true -Dtarget=x86_64-linux
       - go build -o out/doctree-x86_64-linux ./cmd/doctree/
     env:
@@ -201,7 +201,7 @@ tasks:
   cc-x86_64-macos:
     desc: "Cross compile to x86_64-macos using Zig (REQUIRES XCODE, ONLY WORKS ON MACOS)"
     cmds:
-      - rm libs/sinter/bindings/sinter-go/go.mod
+      - rm -f libs/sinter/bindings/sinter-go/go.mod
       - cd libs/sinter && zig build -Drelease-fast=true -Dtarget=x86_64-macos
       - go build -o out/doctree-x86_64-macos -buildmode=pie -ldflags "-s -w -linkmode external" ./cmd/doctree/
     env:
@@ -221,7 +221,7 @@ tasks:
   cc-aarch64-macos:
     desc: "Cross compile to aarch64-macos using Zig (REQUIRES XCODE, ONLY WORKS ON MACOS 12+)"
     cmds:
-      - rm libs/sinter/bindings/sinter-go/go.mod
+      - rm -f libs/sinter/bindings/sinter-go/go.mod
       - cd libs/sinter && zig build -Drelease-fast=true -Dtarget=aarch64-macos
       - go build -o out/doctree-aarch64-macos -buildmode=pie -ldflags "-s -w -linkmode external" ./cmd/doctree/
     env:
@@ -241,7 +241,7 @@ tasks:
   cc-x86_64-windows:
     desc: "Cross compile to x86_64-windows using Zig"
     cmds:
-      - rm libs/sinter/bindings/sinter-go/go.mod
+      - rm -f libs/sinter/bindings/sinter-go/go.mod
       - cd libs/sinter && zig build -Drelease-fast=true -Dtarget=x86_64-windows-gnu
       - go build -o out/doctree-x86_64-windows.exe ./cmd/doctree/
     env:

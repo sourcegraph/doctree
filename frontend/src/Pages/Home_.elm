@@ -227,20 +227,19 @@ searchResults request =
         Just response ->
             case response of
                 Ok results ->
-                    E.column [] (List.map (\result -> E.text result) (flattenResults results))
+                    E.column []
+                        (List.map
+                            (\r ->
+                                E.link []
+                                    { url = Url.Builder.absolute [ r.projectName, "-", r.language, "-", r.path ] []
+                                    , label = E.el [ Font.underline ] (E.text r.searchKey)
+                                    }
+                            )
+                            results
+                        )
 
                 Err err ->
                     E.text (httpErrorToString err)
 
         Nothing ->
             E.text "loading.."
-
-
-flattenResult : APISchema.SearchResult -> List String
-flattenResult result =
-    List.map (\key -> String.concat [ result.path, " : ", key ]) result.keys
-
-
-flattenResults : List APISchema.SearchResult -> List String
-flattenResults results =
-    List.concat (List.map (\result -> flattenResult result) results)

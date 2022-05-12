@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 
 	"github.com/hexops/cmder"
@@ -32,41 +33,26 @@ Examples:
 			return &cmder.UsageError{}
 		}
 		dir := flagSet.Arg(0)
-		// ctx := context.Background()
 		projectDir, err := filepath.Abs(dir)
 		if err != nil {
-			return errors.Wrap(err, "AbsoluteProjectDir")
+			return errors.Wrap(err, "AbsProjectDir")
 		}
+		autoIndexPath := filepath.Join(*dataDirFlag, "autoindex")
 
-		monitoredJsonPath := filepath.Join(*dataDirFlag, "monitored")
-
-		// Read JSON from ~/doctree/monitored
-		var monitored []schema.MonitoredDirectory
-		data, err := os.ReadFile(monitoredJsonPath)
+		// Read JSON from ~/.doctree/autoindex
+		autoIndexProjects, err := ReadAutoIndex(autoIndexPath)
 		if err != nil {
-			return errors.Wrap(err, "ReadMonitoredDirectory")
+			return err
 		}
-		json.Unmarshal(data, &monitored)
 
-		// Update the monitored list
-		monitored = append(monitored, schema.MonitoredDirectory{
-			ProjectName: *projectFlag,
-			Path:        projectDir,
+		// Update the autoIndexProjects array
+		autoIndexProjects = append(autoIndexProjects, schema.AutoIndexedProject{
+			Name: *projectFlag,
+			Path: projectDir,
+			Hash: GetDirHash(projectDir),
 		})
 
-		// Store JSON in ~/.doctree/monitored
-		// [{"projectName": "..", "path": "..."}, {...}, ...]
-		f, err := os.Create(monitoredJsonPath)
-		if err != nil {
-			return errors.Wrap(err, "Create")
-		}
-		defer f.Close()
-
-		if err := json.NewEncoder(f).Encode(monitored); err != nil {
-			return errors.Wrap(err, "Encode")
-		}
-
-		return nil
+		return WriteAutoIndex(autoIndexPath, autoIndexProjects)
 	}
 
 	// Register the command.
@@ -80,4 +66,53 @@ Examples:
 			fmt.Fprintf(flag.CommandLine.Output(), "%s", usage)
 		},
 	})
+}
+
+func WriteAutoIndex(autoIndexPath string, autoindexProjects []schema.AutoIndexedProject) error {
+	// Store JSON in ~/.doctree/monitored
+	// [{"projectName": "..", "path": "..."}, {...}, ...]
+	f, err := os.Create(autoIndexPath)
+	if err != nil {
+		return errors.Wrap(err, "Create")
+	}
+	defer f.Close()
+
+	if err := json.NewEncoder(f).Encode(autoindexProjects); err != nil {
+		return errors.Wrap(err, "Encode")
+	}
+
+	return nil
+}
+
+func ReadAutoIndex(autoIndexPath string) ([]schema.AutoIndexedProject, error) {
+	var autoIndexList []schema.AutoIndexedProject
+	data, err := os.ReadFile(autoIndexPath)
+	if err != nil {
+		return nil, errors.Wrap(err, "ReadAutoIndexFile")
+	}
+	json.Unmarshal(data, &autoIndexList)
+
+	return autoIndexList, nil
+}
+
+func GetDirHash(dir string) string {
+	// Reference: https://unix.stackexchange.com/questions/35832/how-do-i-get-the-md5-sum-of-a-directorys-contents-as-one-sum
+	tarCmd := exec.Command("tar", "-cf", "-", dir)
+	md5sumCmd := exec.Command("md5sum")
+
+	pipe, _ := tarCmd.StdoutPipe()
+	defer pipe.Close()
+
+	md5sumCmd.Stdin = pipe
+
+	// Run the tarCmd
+	err := tarCmd.Start()
+	if err != nil {
+		fmt.Printf("tar command failed with '%s'\n", err)
+		return "0"
+	}
+	// Run and get the output of md5sum
+	res, _ := md5sumCmd.Output()
+
+	return string(res)
 }

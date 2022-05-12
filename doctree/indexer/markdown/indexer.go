@@ -53,6 +53,10 @@ func (i *markdownIndexer) IndexDir(ctx context.Context, dir string) (*schema.Ind
 		if err != nil {
 			return nil, errors.Wrap(err, "ReadFile")
 		}
+		path, err := filepath.Rel(dir, path)
+		if err != nil {
+			return nil, errors.Wrap(err, "RelativeFilePath")
+		}
 		files += 1
 		bytes += len(content)
 

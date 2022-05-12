@@ -72,7 +72,7 @@ Examples:
 }
 
 // Serve an HTTP server on the given addr.
-func Serve(cloudMode bool, addr, indexDataDir string) error {
+func Serve(cloudMode bool, addr, indexDataDir string) {
 	log.Printf("Listening on %s", addr)
 	mux := http.NewServeMux()
 	mux.Handle("/", frontendHandler())
@@ -157,9 +157,8 @@ func Serve(cloudMode bool, addr, indexDataDir string) error {
 	}))
 	muxWithGzip := gziphandler.GzipHandler(mux)
 	if err := http.ListenAndServe(addr, muxWithGzip); err != nil {
-		return errors.Wrap(err, "ListenAndServe")
+		log.Fatal(errors.Wrap(err, "ListenAndServe"))
 	}
-	return nil
 }
 
 func frontendHandler() http.Handler {
@@ -213,34 +212,42 @@ func isParentDir(parent, child string) (bool, error) {
 	return !strings.Contains(relativePath, ".."), nil
 }
 
-func ListenAutoIndexedProjects(dataDirFlag *string) error {
+func ListenAutoIndexedProjects(dataDirFlag *string) {
 	// Read the list of projects to monitor.
 	autoIndexPath := filepath.Join(*dataDirFlag, "autoindex")
-	autoindexProjects, err := ReadAutoIndex(autoIndexPath)
+	autoindexedProjects, err := ReadAutoIndex(autoIndexPath)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	// Initialize the fsnotify watcher
+	// TODO: Watch ~/.doctree/autoindex
+	// to re-index newly added projects on the fly?
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer watcher.Close()
 
 	// Configure watcher to watch all dirs mentioned in the 'autoindex' file
-	for i, project := range autoindexProjects {
+	for i, project := range autoindexedProjects {
 		if GetDirHash(project.Path) != project.Hash {
 			log.Printf("Project %s has been modified while server was down, reindexing", project.Name)
 			ctx := context.Background()
 			if err != nil {
 				log.Fatal(err)
 			}
-			RunIndexers(ctx, project.Path, dataDirFlag, &project.Name)
-
+			err := RunIndexers(ctx, project.Path, dataDirFlag, &project.Name)
+			if err != nil {
+				log.Fatal(err)
+			}
 			// Update the autoIndexedProjects array
-			autoindexProjectPtr := &autoindexProjects[i]
+			autoindexProjectPtr := &autoindexedProjects[i]
 			autoindexProjectPtr.Hash = GetDirHash(project.Path)
-			WriteAutoIndex(autoIndexPath, autoindexProjects)
+			err = WriteAutoIndex(autoIndexPath, autoindexedProjects)
+			if err != nil {
+				log.Fatal(err)
+			}
 		}
 
 		// Add the project directory to the watcher
@@ -254,12 +261,12 @@ func ListenAutoIndexedProjects(dataDirFlag *string) error {
 
 	f, err := os.Create(autoIndexPath)
 	if err != nil {
-		return errors.Wrap(err, "Create")
+		log.Fatal(errors.Wrap(err, "Create"))
 	}
 	defer f.Close()
 
-	if err := json.NewEncoder(f).Encode(autoindexProjects); err != nil {
-		return errors.Wrap(err, "Encode")
+	if err := json.NewEncoder(f).Encode(autoindexedProjects); err != nil {
+		log.Fatal(errors.Wrap(err, "Encode"))
 	}
 
 	done := make(chan error)
@@ -270,7 +277,7 @@ func ListenAutoIndexedProjects(dataDirFlag *string) error {
 			select {
 			case ev := <-watcher.Events:
 				log.Println("Event:", ev)
-				for _, dir := range autoindexProjects {
+				for _, dir := range autoindexedProjects {
 					isParent, err := isParentDir(dir.Path, ev.Name)
 					if err != nil {
 						log.Println(err)
@@ -283,7 +290,10 @@ func ListenAutoIndexedProjects(dataDirFlag *string) error {
 							log.Println(err)
 							return
 						}
-						RunIndexers(ctx, dir.Path, dataDirFlag, &dir.Name)
+						err := RunIndexers(ctx, dir.Path, dataDirFlag, &dir.Name)
+						if err != nil {
+							log.Fatal(err)
+						}
 						break // Only reindex for the first matching parent
 					}
 				}
@@ -293,7 +303,4 @@ func ListenAutoIndexedProjects(dataDirFlag *string) error {
 		}
 	}()
 	<-done
-
-	watcher.Close()
-	return nil
 }

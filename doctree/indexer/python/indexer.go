@@ -37,7 +37,7 @@ func (i *pythonIndexer) IndexDir(ctx context.Context, dir string) (*schema.Index
 		if !d.IsDir() {
 			ext := filepath.Ext(path)
 			if ext == ".py" || ext == ".py3" {
-				sources = append(sources, filepath.Clean(dir+"/"+path))
+				sources = append(sources, path)
 			}
 		}
 		return nil
@@ -53,14 +53,11 @@ func (i *pythonIndexer) IndexDir(ctx context.Context, dir string) (*schema.Index
 		if strings.Contains(path, "test_") || strings.Contains(path, "_test") || strings.Contains(path, "tests") {
 			continue
 		}
-		content, err := ioutil.ReadFile(path)
+		content, err := ioutil.ReadFile(dir + "/" + path)
 		if err != nil {
 			return nil, errors.Wrap(err, "ReadFile")
 		}
-		path, err := filepath.Rel(dir, path)
-		if err != nil {
-			return nil, errors.Wrap(err, "RelativeFilePath")
-		}
+
 		files += 1
 		bytes += len(content)
 

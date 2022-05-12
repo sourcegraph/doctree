@@ -17,7 +17,7 @@ func init() {
 	const usage = `
 Examples:
 
-  Register current directory for auto-indexing on changes whenever the server is running:
+  Register current directory for auto-indexing:
 
     $ doctree add .
 `
@@ -33,26 +33,27 @@ Examples:
 			return &cmder.UsageError{}
 		}
 		dir := flagSet.Arg(0)
-		projectDir, err := filepath.Abs(dir)
+
+		projectPath, err := filepath.Abs(dir)
 		if err != nil {
-			return errors.Wrap(err, "AbsProjectDir")
+			return errors.Wrap(err, "projectPath")
 		}
 		autoIndexPath := filepath.Join(*dataDirFlag, "autoindex")
 
 		// Read JSON from ~/.doctree/autoindex
-		autoIndexProjects, err := ReadAutoIndex(autoIndexPath)
+		autoIndexedProjects, err := ReadAutoIndex(autoIndexPath)
 		if err != nil {
 			return err
 		}
 
 		// Update the autoIndexProjects array
-		autoIndexProjects = append(autoIndexProjects, schema.AutoIndexedProject{
+		autoIndexedProjects = append(autoIndexedProjects, schema.AutoIndexedProject{
 			Name: *projectFlag,
-			Path: projectDir,
-			Hash: GetDirHash(projectDir),
+			Path: projectPath,
+			Hash: GetDirHash(projectPath),
 		})
 
-		return WriteAutoIndex(autoIndexPath, autoIndexProjects)
+		return WriteAutoIndex(autoIndexPath, autoIndexedProjects)
 	}
 
 	// Register the command.
@@ -68,35 +69,41 @@ Examples:
 	})
 }
 
-func WriteAutoIndex(autoIndexPath string, autoindexProjects []schema.AutoIndexedProject) error {
-	// Store JSON in ~/.doctree/monitored
-	// [{"projectName": "..", "path": "..."}, {...}, ...]
-	f, err := os.Create(autoIndexPath)
+// Write autoindexedProjects as JSON in the provided filepath.
+func WriteAutoIndex(path string, autoindexedProjects []schema.AutoIndexedProject) error {
+	f, err := os.Create(path)
 	if err != nil {
 		return errors.Wrap(err, "Create")
 	}
 	defer f.Close()
 
-	if err := json.NewEncoder(f).Encode(autoindexProjects); err != nil {
+	if err := json.NewEncoder(f).Encode(autoindexedProjects); err != nil {
 		return errors.Wrap(err, "Encode")
 	}
 
 	return nil
 }
 
-func ReadAutoIndex(autoIndexPath string) ([]schema.AutoIndexedProject, error) {
-	var autoIndexList []schema.AutoIndexedProject
-	data, err := os.ReadFile(autoIndexPath)
+// Read autoindexedProjects array from the provided filepath.
+func ReadAutoIndex(path string) ([]schema.AutoIndexedProject, error) {
+	var autoIndexedProjects []schema.AutoIndexedProject
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, errors.Wrap(err, "ReadAutoIndexFile")
 	}
-	json.Unmarshal(data, &autoIndexList)
+	err = json.Unmarshal(data, &autoIndexedProjects)
+	if err != nil {
+		return nil, errors.Wrap(err, "ParseAutoIndexFile")
+	}
 
-	return autoIndexList, nil
+	return autoIndexedProjects, nil
 }
 
+// Get hash of the directory.
+// It detects changes in content as well as metadata of all the files and subdirectories.
+//
+// Reference: https://unix.stackexchange.com/questions/35832/how-do-i-get-the-md5-sum-of-a-directorys-contents-as-one-sum
 func GetDirHash(dir string) string {
-	// Reference: https://unix.stackexchange.com/questions/35832/how-do-i-get-the-md5-sum-of-a-directorys-contents-as-one-sum
 	tarCmd := exec.Command("tar", "-cf", "-", dir)
 	md5sumCmd := exec.Command("md5sum")
 
@@ -105,13 +112,13 @@ func GetDirHash(dir string) string {
 
 	md5sumCmd.Stdin = pipe
 
-	// Run the tarCmd
+	// Run the tar command
 	err := tarCmd.Start()
 	if err != nil {
 		fmt.Printf("tar command failed with '%s'\n", err)
 		return "0"
 	}
-	// Run and get the output of md5sum
+	// Run and get the output of md5sum command
 	res, _ := md5sumCmd.Output()
 
 	return string(res)

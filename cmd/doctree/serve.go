@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -9,12 +10,17 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"strings"
+	"syscall"
 
 	"github.com/NYTimes/gziphandler"
+	"github.com/fsnotify/fsnotify"
 	"github.com/hexops/cmder"
 	"github.com/pkg/errors"
 	"github.com/sourcegraph/doctree/doctree/indexer"
+	"github.com/sourcegraph/doctree/doctree/schema"
 	"github.com/sourcegraph/doctree/frontend"
 )
 
@@ -42,7 +48,15 @@ Examples:
 	handler := func(args []string) error {
 		_ = flagSet.Parse(args)
 		indexDataDir := filepath.Join(*dataDirFlag, "index")
-		return Serve(*cloudModeFlag, *httpFlag, indexDataDir)
+
+		signals := make(chan os.Signal, 1)
+		signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
+
+		go ListenToMonitoredProjects(dataDirFlag)
+		go Serve(*cloudModeFlag, *httpFlag, indexDataDir)
+		<-signals
+
+		return nil
 	}
 
 	// Register the command.
@@ -190,4 +204,72 @@ func frontendHandler() http.Handler {
 
 		fileServer.ServeHTTP(w, req)
 	})
+}
+
+func isParentDir(parent, child string) (bool, error) {
+	relativePath, err := filepath.Rel(parent, child)
+	if err != nil {
+		return false, err
+	}
+	return !strings.Contains(relativePath, ".."), nil
+}
+
+func ListenToMonitoredProjects(dataDirFlag *string) error {
+	monitoredJsonPath := filepath.Join(*dataDirFlag, "monitored")
+	var monitored []schema.MonitoredDirectory
+	data, err := os.ReadFile(monitoredJsonPath)
+	if err != nil {
+		return errors.Wrap(err, "ReadMonitoredDirectory")
+	}
+	json.Unmarshal(data, &monitored)
+
+	// Watch the directory for file changes
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Configure watcher to watch all dirs mentioned in the 'monitored' file
+	for _, dir := range monitored {
+		err = watcher.Add(dir.Path)
+		if err != nil {
+			log.Fatal(err)
+		}
+		log.Println("Watching", dir)
+	}
+
+	done := make(chan error)
+
+	// Process events
+	go func() {
+		for {
+			select {
+			case ev := <-watcher.Events:
+				log.Println("Event:", ev)
+				for _, dir := range monitored {
+					isParent, err := isParentDir(dir.Path, ev.Name)
+					if err != nil {
+						log.Println(err)
+						return
+					}
+					if isParent {
+						log.Println("Reindexing", dir)
+						ctx := context.Background()
+						if err != nil {
+							log.Println(err)
+							return
+						}
+						RunIndexers(ctx, dir.Path, dataDirFlag, &dir.ProjectName)
+						break // Only reindex for the first matching parent
+					}
+				}
+			case err := <-watcher.Errors:
+				log.Println("Error:", err)
+			}
+		}
+	}()
+	<-done
+
+	watcher.Close()
+	return nil
 }

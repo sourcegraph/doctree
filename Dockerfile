@@ -29,6 +29,9 @@ COPY --from=builder /out/ /usr/local/bin
 # For doctree to inspect Git repository URIs.
 RUN apk add --no-cache git
 
+# TODO: Although libsinter is built with musl, CGO uses glibc still. Should remove that dependency.
+RUN apk add --no-cache libgcc libstdc++
+
 # Create data volume.
 RUN mkdir -p /home/nonroot/.doctree
 RUN chown -R nonroot:nonroot /home/nonroot/.doctree

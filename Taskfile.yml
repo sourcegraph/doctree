@@ -177,7 +177,8 @@ tasks:
     cmds:
       - docker build --no-cache -t sourcegraph/doctree:dev .
     deps:
-      - task: build
+      - task: cc-x86_64-linux
+      - task: build-elm-release
 
   run-image:
     desc: Run sourcegraph/doctree:dev Docker image

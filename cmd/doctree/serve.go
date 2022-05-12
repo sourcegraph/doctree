@@ -12,7 +12,6 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
-	"strings"
 	"syscall"
 
 	"github.com/NYTimes/gziphandler"
@@ -202,14 +201,6 @@ func frontendHandler() http.Handler {
 
 		fileServer.ServeHTTP(w, req)
 	})
-}
-
-func isParentDir(parent, child string) (bool, error) {
-	relativePath, err := filepath.Rel(parent, child)
-	if err != nil {
-		return false, err
-	}
-	return !strings.Contains(relativePath, ".."), nil
 }
 
 func ListenAutoIndexedProjects(dataDirFlag *string) {

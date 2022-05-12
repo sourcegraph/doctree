@@ -242,8 +242,7 @@ func ListenAutoIndexedProjects(dataDirFlag *string) {
 		}
 
 		// Add the project directory to the watcher
-		// TODO: Watch nested directories
-		err = watcher.Add(project.Path)
+		err = recursiveWatch(watcher, project.Path)
 		if err != nil {
 			log.Fatal(err)
 		}

@@ -8,13 +8,13 @@ package schema
 const LatestVersion = "0.0.1"
 
 type AutoIndexedProject struct {
-	// Name of the project to be monitored (default value is the git repo url.)
+	// Name of the project to be auto-indexed
 	Name string `json:"projectName"`
 
-	// Path of the project directory that is to be monitored (absolute path.)
+	// Path of the project directory to be auto-indexed (absolute path.)
 	Path string `json:"path"`
 
-	// Last modified timestamp of the directory.
+	// Hash of the project directory.
 	Hash string `json:"hash"`
 }
 

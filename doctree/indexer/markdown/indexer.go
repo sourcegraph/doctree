@@ -37,7 +37,7 @@ func (i *markdownIndexer) IndexDir(ctx context.Context, dir string) (*schema.Ind
 		if !d.IsDir() {
 			ext := filepath.Ext(path)
 			if ext == ".md" {
-				sources = append(sources, path)
+				sources = append(sources, dir+"/"+path)
 			}
 		}
 		return nil

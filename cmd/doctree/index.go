@@ -42,28 +42,7 @@ Examples:
 		dir := flagSet.Arg(0)
 
 		ctx := context.Background()
-		indexes, indexErr := indexer.IndexDir(ctx, dir)
-		for _, index := range indexes {
-			fmt.Printf("%v: indexed %v files (%v bytes) in %v\n", index.Language.ID, index.NumFiles, index.NumBytes, time.Duration(index.DurationSeconds*float64(time.Second)).Round(time.Millisecond))
-		}
-
-		indexDataDir := filepath.Join(*dataDirFlag, "index")
-		writeErr := indexer.WriteIndexes(*projectFlag, indexDataDir, indexes)
-		if indexErr != nil && writeErr != nil {
-			return multierror.Append(indexErr, writeErr)
-		}
-		if indexErr != nil {
-			return indexErr
-		}
-		if writeErr != nil {
-			return writeErr
-		}
-
-		err := indexer.IndexForSearch(*projectFlag, indexDataDir, indexes)
-		if err != nil {
-			return errors.Wrap(err, "IndexForSearch")
-		}
-		return nil
+		return RunIndexers(ctx, dir, dataDirFlag, projectFlag)
 	}
 
 	// Register the command.
@@ -77,4 +56,29 @@ Examples:
 			fmt.Fprintf(flag.CommandLine.Output(), "%s", usage)
 		},
 	})
+}
+
+func RunIndexers(ctx context.Context, dir string, dataDirFlag, projectFlag *string) error {
+	indexes, indexErr := indexer.IndexDir(ctx, dir)
+	for _, index := range indexes {
+		fmt.Printf("%v: indexed %v files (%v bytes) in %v\n", index.Language.ID, index.NumFiles, index.NumBytes, time.Duration(index.DurationSeconds*float64(time.Second)).Round(time.Millisecond))
+	}
+
+	indexDataDir := filepath.Join(*dataDirFlag, "index")
+	writeErr := indexer.WriteIndexes(*projectFlag, indexDataDir, indexes)
+	if indexErr != nil && writeErr != nil {
+		return multierror.Append(indexErr, writeErr)
+	}
+	if indexErr != nil {
+		return indexErr
+	}
+	if writeErr != nil {
+		return writeErr
+	}
+
+	err := indexer.IndexForSearch(*projectFlag, indexDataDir, indexes)
+	if err != nil {
+		return errors.Wrap(err, "IndexForSearch")
+	}
+	return nil
 }

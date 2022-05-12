@@ -7,6 +7,14 @@ package schema
 // LatestVersion of the doctree schema (semver.)
 const LatestVersion = "0.0.1"
 
+type MonitoredDirectory struct {
+	// Name of the project to be monitored (default value is the git repo url.)
+	ProjectName string `json:"projectName"`
+
+	// Path of the directory that is to be monitored (absolute path.)
+	Path string `json:"path"`
+}
+
 // Index is the top-most data structure in the doctree schema. It is produed by running a language
 // indexer over a directory, which may contain one or more libraries of code.
 type Index struct {

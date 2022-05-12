@@ -9,17 +9,19 @@ module Shared exposing
 
 import APISchema
 import Http
-import Json.Decode as Json
+import Json.Decode as Decode exposing (Decoder)
+import Json.Decode.Pipeline as Pipeline
 import Request exposing (Request)
 import Url.Builder
 
 
 type alias Flags =
-    Json.Value
+    Decode.Value
 
 
 type alias Model =
-    { currentProjectName : Maybe String
+    { flags : DecodedFlags
+    , currentProjectName : Maybe String
     , projectIndexes : Maybe (Result Http.Error APISchema.ProjectIndexes)
     }
 
@@ -29,10 +31,24 @@ type Msg
     | GotProject (Result Http.Error APISchema.ProjectIndexes)
 
 
+flagsDecoder : Decoder DecodedFlags
+flagsDecoder =
+    Decode.succeed DecodedFlags
+        |> Pipeline.required "cloudMode" Decode.bool
+
+
+type alias DecodedFlags =
+    { cloudMode : Bool
+    }
+
+
 init : Request -> Flags -> ( Model, Cmd Msg )
-init _ _ =
+init _ flags =
     ( { currentProjectName = Nothing
       , projectIndexes = Nothing
+      , flags =
+            Decode.decodeValue flagsDecoder flags
+                |> Result.withDefault { cloudMode = False }
       }
     , Cmd.none
     )

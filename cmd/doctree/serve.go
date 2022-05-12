@@ -36,12 +36,13 @@ Examples:
 	flagSet := flag.NewFlagSet("serve", flag.ExitOnError)
 	dataDirFlag := flagSet.String("data-dir", defaultDataDir(), "where doctree stores its data")
 	httpFlag := flagSet.String("http", ":3333", "address to bind for the HTTP server")
+	cloudModeFlag := flagSet.Bool("cloud", false, "run in cloud mode (i.e. doctree.org)")
 
 	// Handles calls to our subcommand.
 	handler := func(args []string) error {
 		_ = flagSet.Parse(args)
 		indexDataDir := filepath.Join(*dataDirFlag, "index")
-		return Serve(*httpFlag, indexDataDir)
+		return Serve(*cloudModeFlag, *httpFlag, indexDataDir)
 	}
 
 	// Register the command.
@@ -58,10 +59,24 @@ Examples:
 }
 
 // Serve an HTTP server on the given addr.
-func Serve(addr, indexDataDir string) error {
+func Serve(cloudMode bool, addr, indexDataDir string) error {
 	log.Printf("Listening on %s", addr)
 	mux := http.NewServeMux()
 	mux.Handle("/", frontendHandler())
+	mux.Handle("/main.js", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		flags := struct {
+			CloudMode bool `json:"cloudMode"`
+		}{CloudMode: cloudMode}
+
+		flagsJson, err := json.Marshal(flags)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/javascript")
+		fmt.Fprintf(w, `Elm.Main.init({flags: %s})`, flagsJson)
+	}))
 	mux.Handle("/api/list", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// SECURITY: This endpoint isn't mutable and doesn't serve privileged information, and
 		// therefor safe to use from any origin.
@@ -159,7 +174,7 @@ func frontendHandler() http.Handler {
 		return proxy
 	}
 
-	// Server assets that are embedded into Go binary.
+	// Serve assets that are embedded into Go binary.
 	fs := http.FS(frontend.EmbeddedFS())
 	fileServer := http.FileServer(fs)
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {

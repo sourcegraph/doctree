@@ -6,6 +6,11 @@ tasks:
     cmds:
       - task --parallel fmt-lint backend frontend --watch
 
+  cloud:
+    desc: Run development server, watching code files for changes.
+    cmds:
+      - task --parallel fmt-lint backend-cloud frontend --watch
+
   fmt-lint:
     desc: "Run formatters and linters"
     cmds:
@@ -16,6 +21,15 @@ tasks:
     desc: Run "doctree serve" backend
     cmds:
       - .bin/doctree serve
+    env:
+      ELM_DEBUG_SERVER: "http://localhost:1234/"
+    deps:
+      - build-go-debug
+
+  backend-cloud:
+    desc: Run "doctree serve -cloud" backend
+    cmds:
+      - .bin/doctree serve -cloud
     env:
       ELM_DEBUG_SERVER: "http://localhost:1234/"
     deps:

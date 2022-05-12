@@ -32,7 +32,7 @@ page shared req =
     Page.element
         { init = init
         , update = update
-        , view = view
+        , view = view shared.flags.cloudMode
         , subscriptions = subscriptions
         }
 
@@ -139,8 +139,8 @@ subscriptions model =
 -- VIEW
 
 
-view : Model -> View Msg
-view model =
+view : Bool -> Model -> View Msg
+view cloudMode model =
     { title = "doctree"
     , body =
         [ E.layout (List.concat [ Style.layout, [ E.width E.fill ] ])
@@ -153,6 +153,40 @@ view model =
                                 , searchInput
                                 , if model.query /= "" then
                                     Element.Lazy.lazy searchResults model.results
+
+                                  else if cloudMode then
+                                    E.column [ E.centerX ]
+                                        [ Style.h2 [ E.paddingXY 0 32 ] (E.text "# Try doctree (sample projects)")
+                                        , E.column [] (projectsList list)
+                                        , Style.h2 [ E.paddingEach { top = 32, right = 0, bottom = 0, left = 0 } ]
+                                            (E.text "# Add your repository to doctree.org")
+                                        , E.paragraph [ E.paddingEach { top = 32, right = 0, bottom = 0, left = 0 } ]
+                                            [ E.text "(coming soon)"
+                                            ]
+                                        , Style.h2 [ E.paddingEach { top = 32, right = 0, bottom = 0, left = 0 } ]
+                                            (E.text "# Experimental! Early stages!")
+                                        , E.paragraph [ E.paddingEach { top = 16, right = 0, bottom = 0, left = 0 } ]
+                                            [ E.text "We're working on adding more languages, polishing the experience, and adding usage examples. It's all very early stages and experimental - please bear with us!"
+                                            ]
+                                        , Style.h3 [ E.paddingEach { top = 32, right = 0, bottom = 0, left = 0 } ]
+                                            (E.text "# 100% open-source library docs tool for every language")
+                                        , E.paragraph [ E.paddingEach { top = 16, right = 0, bottom = 0, left = 0 } ]
+                                            [ E.text "Available "
+                                            , E.link [ Font.underline ] { url = "https://github.com/sourcegraph/doctree", label = E.text "on GitHub" }
+                                            , E.text ", doctree provides first-class library documentation for every language (based on tree-sitter), with symbol search & more. Using Sourcegraph, it can automatically find real-world usage examples."
+                                            ]
+                                        , Style.h3 [ E.paddingEach { top = 32, right = 0, bottom = 0, left = 0 } ] (E.text "# Run locally, self-host, or use doctree.org")
+                                        , E.paragraph [ E.paddingEach { top = 16, right = 0, bottom = 0, left = 0 } ]
+                                            [ E.text "doctree is a single binary, and is designed to be lightweight for use on your personal machine. It's easy to self-host, or you can use via doctree.org with any GitHub repository."
+                                            , E.link [ Font.underline ] { url = "https://github.com/sourcegraph/doctree#installation", label = E.text "installation instructions" }
+                                            , E.text ")"
+                                            ]
+                                        , E.paragraph [ E.paddingEach { top = 16, right = 0, bottom = 0, left = 0 } ]
+                                            [ E.text "Extremely early stages (pre v0.1), please see "
+                                            , E.link [ Font.underline ] { url = "https://github.com/sourcegraph/doctree/issues/27", label = E.text "our v1.0 roadmap" }
+                                            , E.text " for more details on where we're going! Ideas/feedback welcome!"
+                                            ]
+                                        ]
 
                                   else
                                     E.column [ E.centerX ]

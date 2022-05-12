@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/fsnotify/fsnotify"
 	"github.com/pkg/errors"
 )
 
@@ -94,4 +95,20 @@ func GetDirHash(dir string) string {
 	res, _ := md5sumCmd.Output()
 
 	return string(res)
+}
+
+// Recursively watch a directory
+func recursiveWatch(watcher *fsnotify.Watcher, dir string) error {
+	err := filepath.Walk(dir, func(walkPath string, fi os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if fi.IsDir() && !strings.HasPrefix(fi.Name(), ".") { // file is directory and isn't hidden
+			if err = watcher.Add(walkPath); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	return err
 }

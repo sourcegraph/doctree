@@ -37,7 +37,7 @@ func (i *markdownIndexer) IndexDir(ctx context.Context, dir string) (*schema.Ind
 		if !d.IsDir() {
 			ext := filepath.Ext(path)
 			if ext == ".md" {
-				sources = append(sources, dir+"/"+path)
+				sources = append(sources, path)
 			}
 		}
 		return nil
@@ -49,13 +49,9 @@ func (i *markdownIndexer) IndexDir(ctx context.Context, dir string) (*schema.Ind
 	bytes := 0
 	pages := []schema.Page{}
 	for _, path := range sources {
-		content, err := ioutil.ReadFile(path)
+		content, err := ioutil.ReadFile(dir + "/" + path)
 		if err != nil {
 			return nil, errors.Wrap(err, "ReadFile")
-		}
-		path, err := filepath.Rel(dir, path)
-		if err != nil {
-			return nil, errors.Wrap(err, "RelativeFilePath")
 		}
 		files += 1
 		bytes += len(content)

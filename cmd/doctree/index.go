@@ -58,6 +58,7 @@ Examples:
 	})
 }
 
+// Runs all the registered language indexes along with the search indexer and stores the results.
 func RunIndexers(ctx context.Context, dir string, dataDirFlag, projectFlag *string) error {
 	indexes, indexErr := indexer.IndexDir(ctx, dir)
 	for _, index := range indexes {

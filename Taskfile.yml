@@ -271,3 +271,45 @@ tasks:
       - out/doctree-x86_64-windows.exe
     deps:
       - task: build-elm-release
+
+  ops-add-repo:
+    desc: "Add a repo to doctree.org (requires operations access)"
+    cmds:
+      - ssh $HOST -t 'rm -rf repo/'
+      - ssh $HOST -t 'git clone --depth 1 {{.CLI_ARGS}} repo'
+      - ssh $HOST -t 'chown 10000:10001 -R repo'
+      - ssh $HOST -t 'cd repo/ && docker run -i --volume $(pwd):/index --volume /.doctree:/home/nonroot/.doctree --entrypoint=sh sourcegraph/doctree:latest -c "cd /index && doctree index ."'
+    env:
+      HOST: root@164.92.76.86
+
+  ops-remove-all:
+    desc: "Remove all data from doctree.org (requires operations access)"
+    cmds:
+      - ssh $HOST -t 'rm -rf /.doctree'
+      - ssh $HOST -t 'mkdir /.doctree'
+      - ssh $HOST -t 'chown 10000:10001 -R /.doctree'
+    env:
+      HOST: root@164.92.76.86
+
+  ops-add-sample-repos:
+    desc: "Add sample repos to doctree.org (requires operations access)"
+    cmds:
+      # Go
+      - task ops-add-repo -- https://github.com/golang/go
+      - task ops-add-repo -- https://github.com/gorilla/mux
+      # Python
+      - task ops-add-repo -- https://github.com/django/django
+      # Markdown
+      - task ops-add-repo -- https://github.com/Sobeston/ziglearn
+    env:
+      HOST: root@164.92.76.86
+
+  ops-deploy:
+    desc: "Deploy latest version to doctree.org (requires operations access)"
+    cmds:
+      - ssh $HOST -t 'docker pull sourcegraph/doctree:latest'
+      - ssh $HOST -t 'docker rm -f doctree || true'
+      - ssh $HOST -t 'docker run -d --rm --name doctree -p 80:3333 --volume /.doctree:/home/nonroot/.doctree sourcegraph/doctree:latest'
+      - ssh $HOST -t 'docker ps'
+    env:
+      HOST: root@164.92.76.86

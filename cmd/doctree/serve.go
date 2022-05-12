@@ -20,7 +20,6 @@ import (
 	"github.com/hexops/cmder"
 	"github.com/pkg/errors"
 	"github.com/sourcegraph/doctree/doctree/indexer"
-	"github.com/sourcegraph/doctree/doctree/schema"
 	"github.com/sourcegraph/doctree/frontend"
 )
 
@@ -52,7 +51,7 @@ Examples:
 		signals := make(chan os.Signal, 1)
 		signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
 
-		go ListenToMonitoredProjects(dataDirFlag)
+		go ListenAutoIndexedProjects(dataDirFlag)
 		go Serve(*cloudModeFlag, *httpFlag, indexDataDir)
 		<-signals
 
@@ -214,28 +213,53 @@ func isParentDir(parent, child string) (bool, error) {
 	return !strings.Contains(relativePath, ".."), nil
 }
 
-func ListenToMonitoredProjects(dataDirFlag *string) error {
-	monitoredJsonPath := filepath.Join(*dataDirFlag, "monitored")
-	var monitored []schema.MonitoredDirectory
-	data, err := os.ReadFile(monitoredJsonPath)
+func ListenAutoIndexedProjects(dataDirFlag *string) error {
+	// Read the list of projects to monitor.
+	autoIndexPath := filepath.Join(*dataDirFlag, "autoindex")
+	autoindexProjects, err := ReadAutoIndex(autoIndexPath)
 	if err != nil {
-		return errors.Wrap(err, "ReadMonitoredDirectory")
+		log.Fatal(err)
 	}
-	json.Unmarshal(data, &monitored)
 
-	// Watch the directory for file changes
+	// Initialize the fsnotify watcher
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	// Configure watcher to watch all dirs mentioned in the 'monitored' file
-	for _, dir := range monitored {
-		err = watcher.Add(dir.Path)
+	// Configure watcher to watch all dirs mentioned in the 'autoindex' file
+	for i, project := range autoindexProjects {
+		if GetDirHash(project.Path) != project.Hash {
+			log.Printf("Project %s has been modified while server was down, reindexing", project.Name)
+			ctx := context.Background()
+			if err != nil {
+				log.Fatal(err)
+			}
+			RunIndexers(ctx, project.Path, dataDirFlag, &project.Name)
+
+			// Update the autoIndexedProjects array
+			autoindexProjectPtr := &autoindexProjects[i]
+			autoindexProjectPtr.Hash = GetDirHash(project.Path)
+			WriteAutoIndex(autoIndexPath, autoindexProjects)
+		}
+
+		// Add the project directory to the watcher
+		// TODO: Watch nested directories
+		err = watcher.Add(project.Path)
 		if err != nil {
 			log.Fatal(err)
 		}
-		log.Println("Watching", dir)
+		log.Println("Watching", project)
+	}
+
+	f, err := os.Create(autoIndexPath)
+	if err != nil {
+		return errors.Wrap(err, "Create")
+	}
+	defer f.Close()
+
+	if err := json.NewEncoder(f).Encode(autoindexProjects); err != nil {
+		return errors.Wrap(err, "Encode")
 	}
 
 	done := make(chan error)
@@ -246,7 +270,7 @@ func ListenToMonitoredProjects(dataDirFlag *string) error {
 			select {
 			case ev := <-watcher.Events:
 				log.Println("Event:", ev)
-				for _, dir := range monitored {
+				for _, dir := range autoindexProjects {
 					isParent, err := isParentDir(dir.Path, ev.Name)
 					if err != nil {
 						log.Println(err)
@@ -259,7 +283,7 @@ func ListenToMonitoredProjects(dataDirFlag *string) error {
 							log.Println(err)
 							return
 						}
-						RunIndexers(ctx, dir.Path, dataDirFlag, &dir.ProjectName)
+						RunIndexers(ctx, dir.Path, dataDirFlag, &dir.Name)
 						break // Only reindex for the first matching parent
 					}
 				}

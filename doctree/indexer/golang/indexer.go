@@ -39,7 +39,7 @@ func (i *goIndexer) IndexDir(ctx context.Context, dir string) (*schema.Index, er
 		if !d.IsDir() {
 			ext := filepath.Ext(path)
 			if ext == ".go" {
-				sources = append(sources, path)
+				sources = append(sources, dir+"/"+path)
 			}
 		}
 		return nil
@@ -58,6 +58,10 @@ func (i *goIndexer) IndexDir(ctx context.Context, dir string) (*schema.Index, er
 		content, err := ioutil.ReadFile(path)
 		if err != nil {
 			return nil, errors.Wrap(err, "ReadFile")
+		}
+		path, err := filepath.Rel(dir, path)
+		if err != nil {
+			return nil, errors.Wrap(err, "RelativeFilePath")
 		}
 		files += 1
 		bytes += len(content)

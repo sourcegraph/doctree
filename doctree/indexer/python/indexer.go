@@ -57,6 +57,10 @@ func (i *pythonIndexer) IndexDir(ctx context.Context, dir string) (*schema.Index
 		if err != nil {
 			return nil, errors.Wrap(err, "ReadFile")
 		}
+		path, err := filepath.Rel(dir, path)
+		if err != nil {
+			return nil, errors.Wrap(err, "RelativeFilePath")
+		}
 		files += 1
 		bytes += len(content)
 

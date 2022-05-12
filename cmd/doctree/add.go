@@ -5,7 +5,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 
 	"github.com/hexops/cmder"
@@ -97,29 +96,4 @@ func ReadAutoIndex(path string) ([]schema.AutoIndexedProject, error) {
 	}
 
 	return autoIndexedProjects, nil
-}
-
-// Get hash of the directory.
-// It detects changes in content as well as metadata of all the files and subdirectories.
-//
-// Reference: https://unix.stackexchange.com/questions/35832/how-do-i-get-the-md5-sum-of-a-directorys-contents-as-one-sum
-func GetDirHash(dir string) string {
-	tarCmd := exec.Command("tar", "-cf", "-", dir)
-	md5sumCmd := exec.Command("md5sum")
-
-	pipe, _ := tarCmd.StdoutPipe()
-	defer pipe.Close()
-
-	md5sumCmd.Stdin = pipe
-
-	// Run the tar command
-	err := tarCmd.Start()
-	if err != nil {
-		fmt.Printf("tar command failed with '%s'\n", err)
-		return "0"
-	}
-	// Run and get the output of md5sum command
-	res, _ := md5sumCmd.Output()
-
-	return string(res)
 }

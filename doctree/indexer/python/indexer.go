@@ -4,7 +4,6 @@ package python
 import (
 	"context"
 	"io/fs"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -53,7 +52,8 @@ func (i *pythonIndexer) IndexDir(ctx context.Context, dir string) (*schema.Index
 		if strings.Contains(path, "test_") || strings.Contains(path, "_test") || strings.Contains(path, "tests") {
 			continue
 		}
-		content, err := ioutil.ReadFile(dir + "/" + path)
+		dirFS := os.DirFS(dir)
+		content, err := fs.ReadFile(dirFS, path)
 		if err != nil {
 			return nil, errors.Wrap(err, "ReadFile")
 		}

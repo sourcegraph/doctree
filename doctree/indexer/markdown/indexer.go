@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"context"
 	"io/fs"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -49,7 +48,8 @@ func (i *markdownIndexer) IndexDir(ctx context.Context, dir string) (*schema.Ind
 	bytes := 0
 	pages := []schema.Page{}
 	for _, path := range sources {
-		content, err := ioutil.ReadFile(dir + "/" + path)
+		dirFS := os.DirFS(dir)
+		content, err := fs.ReadFile(dirFS, path)
 		if err != nil {
 			return nil, errors.Wrap(err, "ReadFile")
 		}

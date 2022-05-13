@@ -7,17 +7,6 @@ package schema
 // LatestVersion of the doctree schema (semver.)
 const LatestVersion = "0.0.1"
 
-type AutoIndexedProject struct {
-	// Name of the project to be auto-indexed
-	Name string `json:"projectName"`
-
-	// Path of the project directory to be auto-indexed (absolute path.)
-	Path string `json:"path"`
-
-	// Hash of the project directory.
-	Hash string `json:"hash"`
-}
-
 // Index is the top-most data structure in the doctree schema. It is produed by running a language
 // indexer over a directory, which may contain one or more libraries of code.
 type Index struct {

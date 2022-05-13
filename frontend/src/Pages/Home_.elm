@@ -215,7 +215,8 @@ logo =
             ]
             { src = "/mascot.svg", description = "cute computer / doctree mascot" }
         , E.column []
-            [ E.el [ Font.size 64, Font.bold ] (E.text "doctree")
+            [ E.el [ Font.size 16, Font.bold, E.alignRight ] (E.text "v0.1")
+            , E.el [ Font.size 64, Font.bold ] (E.text "doctree")
             , E.el [ Font.semiBold ] (E.text "documentation for every language")
             ]
         ]

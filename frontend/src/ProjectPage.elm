@@ -1,7 +1,6 @@
 module ProjectPage exposing (Model, Msg, init, page, subscriptions, update, view)
 
 import APISchema
-import Browser
 import Browser.Dom
 import Dict exposing (keys)
 import Effect exposing (Effect)
@@ -21,8 +20,6 @@ import Shared
 import Style
 import Task
 import Url.Builder
-import Url.Parser
-import Url.Parser.Query
 import Util exposing (httpErrorToString)
 import View exposing (View)
 
@@ -181,7 +178,7 @@ subscriptions model =
 
 view : Shared.Model -> Maybe ProjectURI -> Model -> View Msg
 view shared projectURI model =
-    { title = "TODO"
+    { title = "doctree"
     , body =
         [ case shared.projectIndexes of
             Just response ->

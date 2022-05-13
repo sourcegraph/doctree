@@ -3,6 +3,7 @@ module Pages.Home_ exposing (Model, Msg, page)
 import APISchema
 import Browser.Dom
 import Element as E
+import Element.Border as Border
 import Element.Font as Font
 import Element.Lazy
 import Gen.Params.Home_ exposing (Params)
@@ -262,13 +263,33 @@ searchResults request =
         Just response ->
             case response of
                 Ok results ->
-                    E.column []
+                    E.column [ E.width E.fill ]
                         (List.map
                             (\r ->
-                                E.link []
-                                    { url = Url.Builder.absolute [ r.projectName, "-", r.language, "-", r.path ] [ Url.Builder.string "id" r.id ]
-                                    , label = E.el [ Font.underline ] (E.text r.searchKey)
-                                    }
+                                E.row
+                                    [ E.width E.fill
+                                    , E.paddingXY 0 8
+                                    , Border.color (E.rgb255 210 210 210)
+                                    , Border.widthEach { top = 0, left = 0, bottom = 1, right = 0 }
+                                    ]
+                                    [ E.column []
+                                        [ E.link [ E.paddingEach { top = 0, right = 0, bottom = 4, left = 0 } ]
+                                            { url = Url.Builder.absolute [ r.projectName, "-", r.language, "-", r.path ] [ Url.Builder.string "id" r.id ]
+                                            , label = E.el [ Font.underline ] (E.text r.searchKey)
+                                            }
+                                        , E.el
+                                            [ Font.color (E.rgb 0.6 0.6 0.6)
+                                            , Font.size 14
+                                            ]
+                                            (E.text (shortProjectName r.path))
+                                        ]
+                                    , E.el
+                                        [ E.alignRight
+                                        , Font.color (E.rgb 0.6 0.6 0.6)
+                                        , Font.size 14
+                                        ]
+                                        (E.text (shortProjectName r.projectName))
+                                    ]
                             )
                             results
                         )
@@ -278,3 +299,17 @@ searchResults request =
 
         Nothing ->
             E.text "loading.."
+
+
+shortProjectName : String -> String
+shortProjectName name =
+    trimPrefix name "github.com/"
+
+
+trimPrefix : String -> String -> String
+trimPrefix str prefix =
+    if String.startsWith prefix str then
+        String.dropLeft (String.length prefix) str
+
+    else
+        str

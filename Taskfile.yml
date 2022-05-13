@@ -78,7 +78,7 @@ tasks:
     desc: Build .bin/doctree (debug)
     cmds:
       - mkdir -p .bin
-      - go build -a -ldflags "-w" -o .bin/doctree ./cmd/doctree
+      - go build -ldflags "-w" -o .bin/doctree ./cmd/doctree
     sources:
       - ./**/*.go
       - libs/sinter/**/*.zig
@@ -91,7 +91,7 @@ tasks:
     desc: Build .bin/doctree (release)
     cmds:
       - mkdir -p .bin
-      - go build -a -o .bin/doctree ./cmd/doctree
+      - go build -o .bin/doctree ./cmd/doctree
     sources:
       - ./**/*.go
       - ./frontend/public/**
@@ -316,3 +316,23 @@ tasks:
       - ssh $HOST -t 'docker ps'
     env:
       HOST: root@164.92.76.86
+
+  dev-clone-sample-repos:
+    desc: "Clone sample repos for dev environment"
+    cmds:
+      - rm -rf ../doctree-samples/ && mkdir ../doctree-samples/
+      - cd ../doctree-samples/ && git clone --depth 1 https://github.com/golang/go
+      - cd ../doctree-samples/ && git clone --depth 1 https://github.com/gorilla/mux
+      - cd ../doctree-samples/ && git clone --depth 1 https://github.com/django/django
+      - cd ../doctree-samples/ && git clone --depth 1 https://github.com/Sobeston/ziglearn
+
+  dev-index-sample-repos:
+    desc: "Index sample repos for dev environment"
+    cmds:
+      # Go
+      - cd ../doctree-samples/go && ../../doctree/.bin/doctree index .
+      - cd ../doctree-samples/mux && ../../doctree/.bin/doctree index .
+      # Python
+      - cd ../doctree-samples/django && ../../doctree/.bin/doctree index .
+      # Markdown
+      - cd ../doctree-samples/ziglearn && ../../doctree/.bin/doctree index .

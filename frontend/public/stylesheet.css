@@ -1,3 +1,6 @@
+.markdown {
+  width: 100% !important;
+}
 .markdown, .markdown p {
   font-family: Verdana, Geneva, sans-serif;
   font-size: 18px;
@@ -55,6 +58,22 @@
 .markdown table code {
   background: 0;
   padding: 0;
+}
+.markdown li ul {
+  margin-top: 1rem;
+  margin-bottom: 1rem;
+}
+.markdown li li > * {
+  padding-left: 1rem;
+}
+.markdown li li > *:first-child {
+  padding-left: 0;
+}
+.markdown li li > *:last-child {
+  margin-bottom: 1rem;
+}
+.markdown h5, h6 {
+  font-size: 12px;  
 }
 .markdown blockquote {
   margin: 1rem;

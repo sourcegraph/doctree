@@ -359,8 +359,8 @@ renderSections sections =
 
 renderSection : Schema.Section -> E.Element Msg
 renderSection section =
-    E.column []
-        [ E.column [ maxWidth ]
+    E.column [ E.width E.fill ]
+        [ E.column [ E.width E.fill ]
             [ if section.category then
                 Style.h2 [ E.paddingXY 0 8, E.htmlAttribute (Html.Attributes.id section.id) ]
                     (E.text (String.concat [ "# ", section.label ]))
@@ -373,13 +373,14 @@ renderSection section =
 
               else
                 E.el
-                    [ Border.color (E.rgb255 210 210 210)
+                    [ E.width E.fill
+                    , Border.color (E.rgb255 210 210 210)
                     , Border.widthEach { top = 0, left = 6, bottom = 0, right = 0 }
                     , E.paddingXY 16 16
                     ]
                     (Markdown.render section.detail)
             ]
-        , E.el [] (renderSections section.children)
+        , E.el [ E.width E.fill ] (renderSections section.children)
         ]
 
 

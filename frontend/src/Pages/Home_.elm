@@ -266,7 +266,7 @@ searchResults request =
                         (List.map
                             (\r ->
                                 E.link []
-                                    { url = Url.Builder.absolute [ r.projectName, "-", r.language, "-", r.path ] []
+                                    { url = Url.Builder.absolute [ r.projectName, "-", r.language, "-", r.path ] [ Url.Builder.string "id" r.id ]
                                     , label = E.el [ Font.underline ] (E.text r.searchKey)
                                     }
                             )

@@ -1,6 +1,8 @@
 module ProjectPage exposing (Model, Msg, init, page, subscriptions, update, view)
 
 import APISchema
+import Browser
+import Browser.Dom
 import Dict exposing (keys)
 import Effect exposing (Effect)
 import Element as E
@@ -12,11 +14,15 @@ import Html exposing (Html)
 import Html.Attributes exposing (style)
 import Markdown
 import Page
+import Process
 import Request
 import Schema
 import Shared
 import Style
+import Task
 import Url.Builder
+import Url.Parser
+import Url.Parser.Query
 import Util exposing (httpErrorToString)
 import View exposing (View)
 
@@ -29,13 +35,27 @@ page shared req =
 
         projectURI =
             parseProjectURI rawProjectURI
+
+        urlParams =
+            decodeUrlParams req.query
     in
     Page.advanced
-        { init = init projectURI
+        { init = init projectURI urlParams.id
         , update = update
         , view = view shared projectURI
         , subscriptions = subscriptions
         }
+
+
+type alias UrlParams =
+    { id : Maybe String
+    }
+
+
+decodeUrlParams : Dict.Dict String String -> UrlParams
+decodeUrlParams params =
+    { id = Dict.get "id" params
+    }
 
 
 type ProjectURI
@@ -72,16 +92,47 @@ type alias Model =
     {}
 
 
-init : Maybe ProjectURI -> ( Model, Effect Msg )
-init projectURI =
+init : Maybe ProjectURI -> Maybe String -> ( Model, Effect Msg )
+init projectURI maybeID =
     ( {}
     , case projectURI of
         Just uri ->
-            Effect.fromShared (Shared.GetProject (projectURIName uri))
+            Effect.batch
+                [ Effect.fromShared (Shared.GetProject (projectURIName uri))
+                , case maybeID of
+                    Just id ->
+                        Effect.fromCmd (scrollIntoViewHack id)
+
+                    Nothing ->
+                        Effect.none
+                ]
 
         Nothing ->
             Effect.none
     )
+
+
+{-| HACK to workaround <https://elmlang.slack.com/archives/C192T0Q1E/p1652407639492269>
+maybe a bug in Elm? Without this, Browser.Dom.getElement doesn't work because the
+page isn't rendered yet.
+-}
+scrollIntoViewHack : String -> Cmd Msg
+scrollIntoViewHack id =
+    Cmd.batch
+        [ scrollIntoView 100 id
+        , scrollIntoView 250 id
+        , scrollIntoView 500 id
+        , scrollIntoView 1000 id
+        , scrollIntoView 3000 id
+        ]
+
+
+scrollIntoView : Float -> String -> Cmd Msg
+scrollIntoView sleepTime id =
+    Process.sleep sleepTime
+        |> Task.andThen (\_ -> Browser.Dom.getElement id)
+        |> Task.andThen (\info -> Debug.log (String.fromFloat info.scene.height) (Browser.Dom.setViewport 0 info.element.y))
+        |> Task.attempt (\_ -> NoOp)
 
 
 projectURIName : ProjectURI -> String
@@ -314,10 +365,12 @@ renderSection section =
     E.column []
         [ E.column [ maxWidth ]
             [ if section.category then
-                Style.h2 [ E.paddingXY 0 8 ] (E.text (String.concat [ "# ", section.label ]))
+                Style.h2 [ E.paddingXY 0 8, E.htmlAttribute (Html.Attributes.id section.id) ]
+                    (E.text (String.concat [ "# ", section.label ]))
 
               else
-                Style.h3 [ E.paddingXY 0 8 ] (E.text (String.concat [ "# ", section.label ]))
+                Style.h3 [ E.paddingXY 0 8, E.htmlAttribute (Html.Attributes.id section.id) ]
+                    (E.text (String.concat [ "# ", section.label ]))
             , if section.detail == "" then
                 E.none
 

@@ -243,7 +243,7 @@ searchInput =
             [ Html.Attributes.type_ "text"
             , Html.Attributes.autofocus True
             , Html.Attributes.id "search-input"
-            , Html.Attributes.placeholder "go http.Client.Post"
+            , Html.Attributes.placeholder "http.ListenAndServe"
             , Html.Attributes.style "font-size" "16px"
             , Html.Attributes.style "font-family" "JetBrains Mono, monospace"
             , Html.Attributes.style "padding" "0.5rem"

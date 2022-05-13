@@ -131,7 +131,7 @@ scrollIntoView : Float -> String -> Cmd Msg
 scrollIntoView sleepTime id =
     Process.sleep sleepTime
         |> Task.andThen (\_ -> Browser.Dom.getElement id)
-        |> Task.andThen (\info -> Debug.log (String.fromFloat info.scene.height) (Browser.Dom.setViewport 0 info.element.y))
+        |> Task.andThen (\info -> Browser.Dom.setViewport 0 info.element.y)
         |> Task.attempt (\_ -> NoOp)
 
 

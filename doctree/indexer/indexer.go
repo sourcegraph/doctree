@@ -3,6 +3,7 @@ package indexer
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io/fs"
 	"io/ioutil"
 	"os"
@@ -206,4 +207,35 @@ func encodeProjectName(name string) string {
 
 func decodeProjectName(name string) string {
 	return strings.ReplaceAll(name, "---", "/")
+}
+
+type AutoIndexedProject struct {
+	// Name of the project to be auto-indexed
+	Name string `json:"name"`
+}
+
+// Runs all the registered language indexes along with the search indexer and stores the results.
+func RunIndexers(ctx context.Context, dir string, dataDirFlag, projectFlag *string) error {
+	indexes, indexErr := IndexDir(ctx, dir)
+	for _, index := range indexes {
+		fmt.Printf("%v: indexed %v files (%v bytes) in %v\n", index.Language.ID, index.NumFiles, index.NumBytes, time.Duration(index.DurationSeconds*float64(time.Second)).Round(time.Millisecond))
+	}
+
+	indexDataDir := filepath.Join(*dataDirFlag, "index")
+	writeErr := WriteIndexes(*projectFlag, indexDataDir, indexes)
+	if indexErr != nil && writeErr != nil {
+		return multierror.Append(indexErr, writeErr)
+	}
+	if indexErr != nil {
+		return indexErr
+	}
+	if writeErr != nil {
+		return writeErr
+	}
+
+	err := IndexForSearch(*projectFlag, indexDataDir, indexes)
+	if err != nil {
+		return errors.Wrap(err, "IndexForSearch")
+	}
+	return nil
 }

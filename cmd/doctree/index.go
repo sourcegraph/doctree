@@ -4,14 +4,11 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"path/filepath"
-	"time"
 
-	"github.com/hashicorp/go-multierror"
 	"github.com/hexops/cmder"
-	"github.com/pkg/errors"
 
 	// Register language indexers.
+
 	"github.com/sourcegraph/doctree/doctree/indexer"
 	_ "github.com/sourcegraph/doctree/doctree/indexer/golang"
 	_ "github.com/sourcegraph/doctree/doctree/indexer/markdown"
@@ -31,7 +28,7 @@ Examples:
 	// Parse flags for our subcommand.
 	flagSet := flag.NewFlagSet("index", flag.ExitOnError)
 	dataDirFlag := flagSet.String("data-dir", defaultDataDir(), "where doctree stores its data")
-	projectFlag := flagSet.String("project", defaultProjectName(), "name of the project")
+	projectFlag := flagSet.String("project", defaultProjectName("."), "name of the project")
 
 	// Handles calls to our subcommand.
 	handler := func(args []string) error {
@@ -40,9 +37,12 @@ Examples:
 			return &cmder.UsageError{}
 		}
 		dir := flagSet.Arg(0)
+		if dir != "." {
+			*projectFlag = defaultProjectName(dir)
+		}
 
 		ctx := context.Background()
-		return RunIndexers(ctx, dir, dataDirFlag, projectFlag)
+		return indexer.RunIndexers(ctx, dir, dataDirFlag, projectFlag)
 	}
 
 	// Register the command.
@@ -56,30 +56,4 @@ Examples:
 			fmt.Fprintf(flag.CommandLine.Output(), "%s", usage)
 		},
 	})
-}
-
-// Runs all the registered language indexes along with the search indexer and stores the results.
-func RunIndexers(ctx context.Context, dir string, dataDirFlag, projectFlag *string) error {
-	indexes, indexErr := indexer.IndexDir(ctx, dir)
-	for _, index := range indexes {
-		fmt.Printf("%v: indexed %v files (%v bytes) in %v\n", index.Language.ID, index.NumFiles, index.NumBytes, time.Duration(index.DurationSeconds*float64(time.Second)).Round(time.Millisecond))
-	}
-
-	indexDataDir := filepath.Join(*dataDirFlag, "index")
-	writeErr := indexer.WriteIndexes(*projectFlag, indexDataDir, indexes)
-	if indexErr != nil && writeErr != nil {
-		return multierror.Append(indexErr, writeErr)
-	}
-	if indexErr != nil {
-		return indexErr
-	}
-	if writeErr != nil {
-		return writeErr
-	}
-
-	err := indexer.IndexForSearch(*projectFlag, indexDataDir, indexes)
-	if err != nil {
-		return errors.Wrap(err, "IndexForSearch")
-	}
-	return nil
 }

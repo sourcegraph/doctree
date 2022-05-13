@@ -50,8 +50,13 @@ Examples:
 		signals := make(chan os.Signal, 1)
 		signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
 
-		go ListenAutoIndexedProjects(dataDirFlag)
 		go Serve(*cloudModeFlag, *httpFlag, indexDataDir)
+		go func() {
+			err := ListenAutoIndexedProjects(dataDirFlag)
+			if err != nil {
+				log.Fatal(err)
+			}
+		}()
 		<-signals
 
 		return nil
@@ -203,12 +208,12 @@ func frontendHandler() http.Handler {
 	})
 }
 
-func ListenAutoIndexedProjects(dataDirFlag *string) {
+func ListenAutoIndexedProjects(dataDirFlag *string) error {
 	// Read the list of projects to monitor.
 	autoIndexPath := filepath.Join(*dataDirFlag, "autoindex")
-	autoindexedProjects, err := ReadAutoIndex(autoIndexPath)
+	autoindexedProjects, err := indexer.ReadAutoIndex(autoIndexPath)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	// Initialize the fsnotify watcher
@@ -216,49 +221,26 @@ func ListenAutoIndexedProjects(dataDirFlag *string) {
 	// to re-index newly added projects on the fly?
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 	defer watcher.Close()
 
 	// Configure watcher to watch all dirs mentioned in the 'autoindex' file
-	for i, project := range autoindexedProjects {
-		if GetDirHash(project.Path) != project.Hash {
-			log.Printf("Project %s has been modified while server was down, reindexing", project.Name)
-			ctx := context.Background()
-			if err != nil {
-				log.Fatal(err)
-			}
-			err := RunIndexers(ctx, project.Path, dataDirFlag, &project.Name)
-			if err != nil {
-				log.Fatal(err)
-			}
-			// Update the autoIndexedProjects array
-			autoindexProjectPtr := &autoindexedProjects[i]
-			autoindexProjectPtr.Hash = GetDirHash(project.Path)
-			err = WriteAutoIndex(autoIndexPath, autoindexedProjects)
-			if err != nil {
-				log.Fatal(err)
-			}
-		}
-
+	for projectPath := range autoindexedProjects {
 		// Add the project directory to the watcher
-		err = recursiveWatch(watcher, project.Path)
+		// TODO: Check if the project changed
+		// while the server wasn't running.
+		err = recursiveWatch(watcher, projectPath)
 		if err != nil {
-			log.Fatal(err)
+			return err
 		}
-		log.Println("Watching", project)
+		log.Println("Watching", projectPath)
 	}
 
-	f, err := os.Create(autoIndexPath)
+	err = indexer.WriteAutoIndex(autoIndexPath, autoindexedProjects)
 	if err != nil {
-		log.Fatal(errors.Wrap(err, "Create"))
+		return err
 	}
-	defer f.Close()
-
-	if err := json.NewEncoder(f).Encode(autoindexedProjects); err != nil {
-		log.Fatal(errors.Wrap(err, "Encode"))
-	}
-
 	done := make(chan error)
 
 	// Process events
@@ -267,20 +249,20 @@ func ListenAutoIndexedProjects(dataDirFlag *string) {
 			select {
 			case ev := <-watcher.Events:
 				log.Println("Event:", ev)
-				for _, dir := range autoindexedProjects {
-					isParent, err := isParentDir(dir.Path, ev.Name)
+				for projectPath, project := range autoindexedProjects {
+					isParent, err := isParentDir(projectPath, ev.Name)
 					if err != nil {
 						log.Println(err)
 						return
 					}
 					if isParent {
-						log.Println("Reindexing", dir)
+						log.Println("Reindexing", projectPath)
 						ctx := context.Background()
 						if err != nil {
 							log.Println(err)
 							return
 						}
-						err := RunIndexers(ctx, dir.Path, dataDirFlag, &dir.Name)
+						err := indexer.RunIndexers(ctx, projectPath, dataDirFlag, &project.Name)
 						if err != nil {
 							log.Fatal(err)
 						}
@@ -293,4 +275,6 @@ func ListenAutoIndexedProjects(dataDirFlag *string) {
 		}
 	}()
 	<-done
+
+	return nil
 }

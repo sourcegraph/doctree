@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"context"
 	"io/fs"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -55,7 +54,8 @@ func (i *goIndexer) IndexDir(ctx context.Context, dir string) (*schema.Index, er
 		if strings.HasSuffix(path, "_test.go") {
 			continue
 		}
-		content, err := ioutil.ReadFile(dir + "/" + path)
+		dirFS := os.DirFS(dir)
+		content, err := fs.ReadFile(dirFS, path)
 		if err != nil {
 			return nil, errors.Wrap(err, "ReadFile")
 		}

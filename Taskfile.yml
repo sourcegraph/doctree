@@ -280,6 +280,8 @@ tasks:
       - ssh $HOST -t 'git clone --depth 1 {{.CLI_ARGS}} repo'
       - ssh $HOST -t 'chown 10000:10001 -R repo'
       - ssh $HOST -t 'cd repo/ && docker run -i --volume $(pwd):/index --volume /.doctree:/home/nonroot/.doctree --entrypoint=sh sourcegraph/doctree:latest -c "cd /index && doctree index ."'
+      # TODO why is this necessary? Docker volume becomes not in sync with host, how come?
+      - ssh $HOST -t 'docker restart doctree'
     env:
       HOST: root@164.92.76.86
 
@@ -310,7 +312,7 @@ tasks:
     cmds:
       - ssh $HOST -t 'docker pull sourcegraph/doctree:latest'
       - ssh $HOST -t 'docker rm -f doctree || true'
-      - ssh $HOST -t 'docker run -d --rm --name doctree -p 80:3333 --volume /.doctree:/home/nonroot/.doctree sourcegraph/doctree:latest'
+      - ssh $HOST -t 'docker run -d --rm --name doctree -p 80:3333 --volume /.doctree:/home/nonroot/.doctree sourcegraph/doctree:latest serve -cloud'
       - ssh $HOST -t 'docker ps'
     env:
       HOST: root@164.92.76.86

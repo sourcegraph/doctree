@@ -43,6 +43,8 @@ searchResultDecoder =
         |> Pipeline.required "projectName" Decode.string
         |> Pipeline.required "searchKey" Decode.string
         |> Pipeline.required "path" Decode.string
+        |> Pipeline.required "id" Decode.string
+        |> Pipeline.required "score" Decode.float
 
 
 type alias SearchResult =
@@ -50,4 +52,6 @@ type alias SearchResult =
     , projectName : String
     , searchKey : String
     , path : String
+    , id : String
+    , score : Float
     }

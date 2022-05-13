@@ -30,12 +30,14 @@ func IndexForSearch(projectName, indexDataDir string, indexes map[string]*schema
 	}
 	defer filter.Deinit()
 
-	walkPage := func(p schema.Page, keys [][]string) [][]string {
+	walkPage := func(p schema.Page, keys [][]string, ids []string) ([][]string, []string) {
 		keys = append(keys, p.SearchKey)
+		ids = append(ids, "")
 
 		var walkSection func(s schema.Section)
 		walkSection = func(s schema.Section) {
 			keys = append(keys, s.SearchKey)
+			ids = append(ids, s.ID)
 
 			for _, child := range s.Children {
 				walkSection(child)
@@ -44,15 +46,18 @@ func IndexForSearch(projectName, indexDataDir string, indexes map[string]*schema
 		for _, section := range p.Sections {
 			walkSection(section)
 		}
-		return keys
+		return keys, ids
 	}
 
 	totalNumKeys := 0
 	totalNumSearchKeys := 0
-	insert := func(language, projectName, pagePath string, searchKeys [][]string) error {
+	insert := func(language, projectName, pagePath string, searchKeys [][]string, ids []string) error {
 		absoluteKeys := make([][]string, 0, len(searchKeys))
 		for _, searchKey := range searchKeys {
 			absoluteKeys = append(absoluteKeys, append([]string{language, projectName}, searchKey...))
+		}
+		if len(absoluteKeys) != len(ids) {
+			panic("invariant: len(absoluteKeys) != len(ids)")
 		}
 
 		totalNumSearchKeys += len(searchKeys)
@@ -65,6 +70,7 @@ func IndexForSearch(projectName, indexDataDir string, indexes map[string]*schema
 			Language:    language,
 			ProjectName: projectName,
 			SearchKeys:  searchKeys,
+			IDs:         ids,
 			Path:        pagePath,
 		}); err != nil {
 			return errors.Wrap(err, "Encode")
@@ -79,11 +85,13 @@ func IndexForSearch(projectName, indexDataDir string, indexes map[string]*schema
 	for language, index := range indexes {
 		for _, lib := range index.Libraries {
 			for _, page := range lib.Pages {
-				if err := insert(language, projectName, page.Path, walkPage(page, nil)); err != nil {
+				searchKeys, ids := walkPage(page, nil, nil)
+				if err := insert(language, projectName, page.Path, searchKeys, ids); err != nil {
 					return err
 				}
 				for _, subPage := range page.Subpages {
-					if err := insert(language, projectName, page.Path, walkPage(subPage, nil)); err != nil {
+					searchKeys, ids := walkPage(subPage, nil, nil)
+					if err := insert(language, projectName, page.Path, searchKeys, ids); err != nil {
 						return err
 					}
 				}
@@ -173,6 +181,7 @@ type Result struct {
 	ProjectName string  `json:"projectName"`
 	SearchKey   string  `json:"searchKey"`
 	Path        string  `json:"path"`
+	ID          string  `json:"id"`
 	Score       float64 `json:"score"`
 }
 
@@ -180,6 +189,7 @@ type sinterResult struct {
 	Language    string     `json:"language"`
 	ProjectName string     `json:"projectName"`
 	SearchKeys  [][]string `json:"searchKeys"`
+	IDs         []string   `json:"ids"`
 	Path        string     `json:"path"`
 }
 
@@ -193,7 +203,7 @@ decoding:
 			panic("illegal sinter result value: " + err.Error())
 		}
 
-		for _, searchKey := range result.SearchKeys {
+		for index, searchKey := range result.SearchKeys {
 			absoluteKey := append([]string{result.Language, result.ProjectName}, searchKey...)
 			score := match(queryKey, absoluteKey)
 			if score > 0.5 {
@@ -202,6 +212,7 @@ decoding:
 					ProjectName: result.ProjectName,
 					SearchKey:   strings.Join(searchKey, ""),
 					Path:        result.Path,
+					ID:          result.IDs[index],
 					Score:       score,
 				})
 				if len(out) >= limit {

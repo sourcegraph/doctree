@@ -148,7 +148,7 @@ func Search(ctx context.Context, indexDataDir, query string) ([]Result, error) {
 			return nil, errors.Wrap(err, "FilterReadFile: "+sinterFile)
 		}
 
-		queryKey := strings.FieldsFunc(query, func(r rune) bool { return r == '.' || r == '/' })
+		queryKey := strings.FieldsFunc(query, func(r rune) bool { return r == '.' || r == '/' || r == ' ' })
 		queryKeyHashes := []uint64{}
 		for _, part := range queryKey {
 			queryKeyHashes = append(queryKeyHashes, hash(part))

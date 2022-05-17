@@ -198,7 +198,7 @@ view shared projectURI model =
                                         viewNameLanguage model projectIndexes name language
 
                                     Name name ->
-                                        viewNameLanguage model projectIndexes name ""
+                                        viewName model projectIndexes name
 
                             Nothing ->
                                 E.layout Style.layout (E.text "loading..")
@@ -214,19 +214,32 @@ view shared projectURI model =
 
 viewName : Model -> APISchema.ProjectIndexes -> String -> Html Msg
 viewName model projectIndexes projectName =
-    E.layout Style.layout
-        (E.column []
-            (List.map
-                (\language ->
-                    E.link []
-                        { url =
-                            String.concat
-                                [ Url.Builder.absolute [ projectName, "-", language ] [] ]
-                        , label = E.text language
-                        }
+    E.layout (List.concat [ Style.layout, [ E.width E.fill ] ])
+        (E.column [ E.centerX, E.paddingXY 0 32 ]
+            [ E.row []
+                [ E.link [] { url = "/", label = logo }
+                , E.el [ Region.heading 1, Font.size 24 ] (E.text (String.concat [ " / ", projectName ]))
+                ]
+            , Style.h3 [ E.paddingEach { top = 32, right = 0, bottom = 32, left = 0 } ]
+                (E.text "# Documentation by language")
+            , E.row []
+                (List.map
+                    (\language ->
+                        E.link
+                            [ Font.underline
+                            , E.paddingXY 16 16
+                            , Border.color (E.rgb255 210 210 210)
+                            , Border.widthEach { top = 6, left = 6, bottom = 6, right = 6 }
+                            ]
+                            { url =
+                                String.concat
+                                    [ Url.Builder.absolute [ projectName, "-", language ] [] ]
+                            , label = E.text language
+                            }
+                    )
+                    (Dict.keys projectIndexes)
                 )
-                (Dict.keys projectIndexes)
-            )
+            ]
         )
 
 

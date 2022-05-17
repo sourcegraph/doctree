@@ -29,5 +29,9 @@ h3 attrs child =
     E.paragraph (List.concat [ attrs, [ Region.heading 3, Font.size 20, Font.bold ] ]) [ child ]
 
 
+h4 attrs child =
+    E.paragraph (List.concat [ attrs, [ Region.heading 4, Font.size 16, Font.bold ] ]) [ child ]
+
+
 paragraph attrs child =
     E.paragraph (List.concat [ attrs, [ Font.size 16, Font.family [ Font.typeface "Verdana, Geneva, sans-serif" ] ] ]) child

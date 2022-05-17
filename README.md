@@ -1,36 +1,38 @@
-# Experiment! Super early stages!
+# doctree: 100% open-source library docs tool for every language
 
-Imagine an API docsite generator that generates something like http://pkg.go.dev but:
+doctree provides first-class library documentation for every language (based on tree-sitter), with symbol search & more. If connected to Sourcegraph, it can automatically surface real-world usage examples.
 
-* Works with any language
-* Has symbol-level search
-* Automatically surfaces usage examples
-* Supports both private code and open source
+## Try it at [doctree.org](https://doctree.org)
 
-That's what [we're building here!](https://twitter.com/beyang/status/1516563075192680450)
+[![](https://user-images.githubusercontent.com/3173176/168915777-571410e3-ef6e-486d-86a7-dea926246d2c.png)](https://doctree.org)
 
-## When can I try it?
+## Run locally, self-host, or use doctree.org
 
-If you'd like to try it out once we have an early version, let us know [on Twitter](https://twitter.com/beyang/status/1516563075192680450) or open an issue - we'd love people to try it out as we develop it!
+doctree is a single binary, lightweight, and designed to run on your local machine. It can be self-hosted, and used via doctree.org with any GitHub repository.
 
-Actual project README begins here :)
+## Experimental! Early stages!
 
----
+Extremely early stages, we're working on adding more languages, polishing the experience, and adding usage examples. It's all very early and not yet ready for production use, please bear with us!
 
-# doctree: First-class library docs tool for every language
+Please see [the v1.0 roadmap](https://github.com/sourcegraph/doctree/issues/27) for more, ideas welcome!
 
-Features (aspirational):
+## Join us on Discord
 
-* Symbol search
-* Finds usage examples automagically
-* Based on tree-sitter
-* Runnable standalone or via http://doctree.org (not yet online)
+If you think what we're building is a good idea, we'd love to hear your thoughts!
+[Discord invite](https://discord.gg/vqsBW8m5Y8)
 
-## Try it out (**EXTREMELY** early stages)
+## Language support
 
-Probably not worth trying out yet unless you're *incredibly* excited about this idea.
+Adding support for more languages is easy. To request support for a language [comment on this issue](https://github.com/sourcegraph/doctree/issues/10)
 
-### Installation
+| language | functions | methods | consts/vars | search | usage examples | code intel |
+|----------|-----------|---------|-------------|--------|----------------|------------|
+| Go       | ✅        | ❌       | ❌          | ✅     | ❌             | ❌          |
+| Python   | ✅        | ❌       | ❌          | ✅     | ❌             | ❌          |
+| Zig      | ✅        | partial | ❌          | ✅     | ❌              | ❌          |
+| Markdown | n/a       | n/a     | n/a         | ✅     | n/a            | n/a        |
+
+## Installation
 
 <details>
 <summary>macOS (Apple Silicon)</summary>
@@ -118,7 +120,7 @@ docker run -d --rm --name doctree -p 80:3333 --volume $HOME/.doctree:/home/nonro
 
 </details>
 
-### Usage
+## Usage
 
 Run the server:
 
@@ -134,19 +136,11 @@ doctree index .
 
 Navigate to http://localhost:3333
 
-## Screenshots
-
-<img width="976" alt="image" src="https://user-images.githubusercontent.com/3173176/165888825-b9399cb1-7025-4242-9bcd-5773b6382fff.png">
-
-<img width="976" alt="image" src="https://user-images.githubusercontent.com/3173176/165888831-cdc5cd87-7d9c-4465-bf9a-71e019f3f9bb.png">
-
-<img width="1267" alt="image" src="https://user-images.githubusercontent.com/3173176/165888866-d67829fc-7b82-4d95-b36e-47a2c3fcea24.png">
-
-## Development
+## Contributing
 
 We'd love any contributions!
 
-To get started see [docs/development.md](docs/development.md)
+To get started see [docs/development.md](docs/development.md) and the [language support tracking issue](https://github.com/sourcegraph/doctree/issues/10).
 
 ## Changelog
 
@@ -163,4 +157,4 @@ To get started see [docs/development.md](docs/development.md)
 * Docker images, single-binary downloads for every OS cross-compiled via Zig compiler.
 * Initial [v1.0 roadmap](https://github.com/sourcegraph/doctree/issues/27), [language support tracking issue](https://github.com/sourcegraph/doctree/issues/10)
 
-Special thanks: @KShivendu (Python support)
+Special thanks: [@KShivendu](https://github.com/KShivendu) (Python support), [@slimsag](https://github.com/slimsag) (Zig support)

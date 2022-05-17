@@ -84,7 +84,7 @@ func recursiveWatch(watcher *fsnotify.Watcher, dir string) error {
 		}
 		if fi.IsDir() && !strings.HasPrefix(fi.Name(), ".") { // file is directory and isn't hidden
 			if err = watcher.Add(walkPath); err != nil {
-				return err
+				return errors.Wrap(err, "watcher.Add")
 			}
 		}
 		return nil

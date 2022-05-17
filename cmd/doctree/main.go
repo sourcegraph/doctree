@@ -18,7 +18,7 @@ Usage:
 The commands are:
 	serve    runs a doctree server
 	index    index a directory
-	add      register a directory for auto-indexing
+	add      (EXPERIMENTAL) register a directory for auto-indexing
 
 Use "doctree <command> -h" for more information about a command.
 `

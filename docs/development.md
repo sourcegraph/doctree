@@ -34,6 +34,20 @@ Just run `task` in the repository root and navigate to http://localhost:3333 - i
 
 Best of all, it'll live reload the frontend code as you save changes in your editor. No need to even refresh the page!
 
+## Sample repositories
+
+You can use the following to clone some sample repositories (into `../doctree-samples`) - useful for testing every language supported by Doctree:
+
+```sh
+task dev-clone-sample-repos
+```
+
+And then use the following to index them all:
+
+```sh
+task dev-index-sample-repos
+```
+
 ## Running tests
 
 You can use `task test` or `task test-race` (slower, but checks for race conditions).

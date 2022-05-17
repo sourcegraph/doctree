@@ -165,27 +165,34 @@ view cloudMode model =
                                             [ E.text "(coming soon)"
                                             ]
                                         , Style.h2 [ E.paddingEach { top = 32, right = 0, bottom = 0, left = 0 } ]
-                                            (E.text "# Experimental! Early stages!")
-                                        , Style.paragraph [ E.paddingEach { top = 16, right = 0, bottom = 0, left = 0 } ]
-                                            [ E.text "We're working on adding more languages, polishing the experience, and adding usage examples. It's all very early stages and experimental - please bear with us!"
-                                            ]
+                                            (E.text "# About doctree")
                                         , Style.h3 [ E.paddingEach { top = 32, right = 0, bottom = 0, left = 0 } ]
                                             (E.text "# 100% open-source library docs tool for every language")
                                         , Style.paragraph [ E.paddingEach { top = 16, right = 0, bottom = 0, left = 0 } ]
                                             [ E.text "Available "
                                             , E.link [ Font.underline ] { url = "https://github.com/sourcegraph/doctree", label = E.text "on GitHub" }
-                                            , E.text ", doctree provides first-class library documentation for every language (based on tree-sitter), with symbol search & more. Using Sourcegraph, it can automatically find real-world usage examples."
+                                            , E.text ", doctree provides first-class library documentation for every language (based on tree-sitter), with symbol search & more. If connected to Sourcegraph, it can automatically surface real-world usage examples."
                                             ]
                                         , Style.h3 [ E.paddingEach { top = 32, right = 0, bottom = 0, left = 0 } ] (E.text "# Run locally, self-host, or use doctree.org")
                                         , Style.paragraph [ E.paddingEach { top = 16, right = 0, bottom = 0, left = 0 } ]
-                                            [ E.text "doctree is a single binary, and is designed to be lightweight for use on your personal machine. It's easy to self-host, or you can use via doctree.org with any GitHub repository."
+                                            [ E.text "doctree is a single binary, lightweight, and designed to run on your local machine. It can be self-hosted, and used via doctree.org with any GitHub repository. "
                                             , E.link [ Font.underline ] { url = "https://github.com/sourcegraph/doctree#installation", label = E.text "installation instructions" }
-                                            , E.text ")"
+                                            ]
+                                        , Style.h3 [ E.paddingEach { top = 32, right = 0, bottom = 0, left = 0 } ]
+                                            (E.text "# Experimental! Early stages!")
+                                        , Style.paragraph [ E.paddingEach { top = 16, right = 0, bottom = 0, left = 0 } ]
+                                            [ E.text "Extremely early stages, we're working on adding more languages, polishing the experience, and adding usage examples. It's all very early and not yet ready for production use, please bear with us!"
                                             ]
                                         , Style.paragraph [ E.paddingEach { top = 16, right = 0, bottom = 0, left = 0 } ]
-                                            [ E.text "Extremely early stages (pre v0.1), please see "
-                                            , E.link [ Font.underline ] { url = "https://github.com/sourcegraph/doctree/issues/27", label = E.text "our v1.0 roadmap" }
-                                            , E.text " for more details on where we're going! Ideas/feedback welcome!"
+                                            [ E.text "Please see "
+                                            , E.link [ Font.underline ] { url = "https://github.com/sourcegraph/doctree/issues/27", label = E.text "the v1.0 roadmap" }
+                                            , E.text " for more, ideas welcome!"
+                                            ]
+                                        , Style.h3 [ E.paddingEach { top = 32, right = 0, bottom = 0, left = 0 } ]
+                                            (E.text "# Join us on Discord")
+                                        , Style.paragraph [ E.paddingEach { top = 16, right = 0, bottom = 0, left = 0 } ]
+                                            [ E.text "If you think what we're building is a good idea, we'd love to hear your thoughts! "
+                                            , E.link [ Font.underline ] { url = "https://discord.gg/vqsBW8m5Y8", label = E.text "Discord invite" }
                                             ]
                                         ]
 

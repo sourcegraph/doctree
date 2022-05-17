@@ -6,6 +6,7 @@ import (
 	"encoding/gob"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"os"
 	"path/filepath"
 	"sort"
@@ -145,7 +146,8 @@ func Search(ctx context.Context, indexDataDir, query string) ([]Result, error) {
 	for _, sinterFile := range indexes {
 		sinterFilter, err := sinter.FilterReadFile(sinterFile)
 		if err != nil {
-			return nil, errors.Wrap(err, "FilterReadFile: "+sinterFile)
+			log.Println("error searching", sinterFile, "FilterReadFile:", err)
+			continue
 		}
 
 		queryKey := strings.FieldsFunc(query, func(r rune) bool { return r == '.' || r == '/' || r == ' ' })
@@ -160,7 +162,8 @@ func Search(ctx context.Context, indexDataDir, query string) ([]Result, error) {
 
 		results, err := sinterFilter.QueryLogicalOr(queryKeyHashes)
 		if err != nil {
-			return nil, errors.Wrap(err, "QueryLogicalOr")
+			log.Println("error searching", sinterFile, "QueryLogicalOr:", err)
+			continue
 		}
 		defer results.Deinit()
 

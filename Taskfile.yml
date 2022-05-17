@@ -285,6 +285,19 @@ tasks:
     env:
       HOST: root@164.92.76.86
 
+  ops-add-repo-zigstd:
+    desc: "Add a ziglang/zig stdlib to doctree.org (requires operations access)"
+    cmds:
+      # TODO: Right now, we must cd into lib/std because otherwise indexing ziglang/zig fails!
+      - ssh $HOST -t 'rm -rf repo/'
+      - ssh $HOST -t 'git clone --depth 1 {{.CLI_ARGS}} repo'
+      - ssh $HOST -t 'chown 10000:10001 -R repo'
+      - ssh $HOST -t 'cd repo/lib/std && docker run -i --volume $(pwd):/index --volume /.doctree:/home/nonroot/.doctree --entrypoint=sh sourcegraph/doctree:latest -c "cd /index && doctree index -project=github.com/ziglang/zig ."'
+      # TODO why is this necessary? Docker volume becomes not in sync with host, how come?
+      - ssh $HOST -t 'docker restart doctree'
+    env:
+      HOST: root@164.92.76.86
+
   ops-remove-all:
     desc: "Remove all data from doctree.org (requires operations access)"
     cmds:
@@ -304,6 +317,8 @@ tasks:
       - task ops-add-repo -- https://github.com/django/django
       # Markdown
       - task ops-add-repo -- https://github.com/Sobeston/ziglearn
+      # Zig
+      - task ops-add-repo-zigstd -- https://github.com/ziglang/zig
     env:
       HOST: root@164.92.76.86
 
@@ -325,6 +340,7 @@ tasks:
       - cd ../doctree-samples/ && git clone --depth 1 https://github.com/gorilla/mux
       - cd ../doctree-samples/ && git clone --depth 1 https://github.com/django/django
       - cd ../doctree-samples/ && git clone --depth 1 https://github.com/Sobeston/ziglearn
+      - cd ../doctree-samples/ && git clone --depth 1 https://github.com/ziglang/zig
 
   dev-index-sample-repos:
     desc: "Index sample repos for dev environment"
@@ -336,3 +352,5 @@ tasks:
       - cd ../doctree-samples/django && ../../doctree/.bin/doctree index .
       # Markdown
       - cd ../doctree-samples/ziglearn && ../../doctree/.bin/doctree index .
+      # Zig
+      - cd ../doctree-samples/ziglang/lib/std && ../../doctree/.bin/doctree index -project=github.com/ziglang/zig .

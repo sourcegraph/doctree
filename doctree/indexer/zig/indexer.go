@@ -336,7 +336,7 @@ func (d *depGraph) build() {
 	for filePath := range d.fileToAccessiblePath {
 		path := d.collect(filePath, nil, map[string]struct{}{})
 		d.fileToAccessiblePath[filePath] = strings.Join(path, ".")
-		fmt.Println(filePath, strings.Join(path, "."))
+		// fmt.Println(filePath, strings.Join(path, "."))
 	}
 }
 

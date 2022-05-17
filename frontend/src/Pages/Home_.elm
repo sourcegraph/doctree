@@ -194,6 +194,46 @@ view cloudMode model =
                                             [ E.text "If you think what we're building is a good idea, we'd love to hear your thoughts! "
                                             , E.link [ Font.underline ] { url = "https://discord.gg/vqsBW8m5Y8", label = E.text "Discord invite" }
                                             ]
+                                        , Style.h3 [ E.paddingEach { top = 32, right = 0, bottom = 0, left = 0 } ]
+                                            (E.text "# Language support")
+                                        , Style.paragraph [ E.paddingEach { top = 16, right = 0, bottom = 0, left = 0 } ]
+                                            [ E.text "Adding support for more languages is easy. To request support for a language "
+                                            , E.link [ Font.underline ] { url = "https://github.com/sourcegraph/doctree/issues/10", label = E.text "comment on this issue" }
+                                            , E.text "!"
+                                            ]
+                                        , E.table [ E.paddingEach { top = 16, right = 0, bottom = 0, left = 0 } ]
+                                            { data = supportedLanguages
+                                            , columns =
+                                                [ { header = Style.tableHeader (E.text "language")
+                                                  , width = E.fill
+                                                  , view = \lang -> Style.tableCell (E.text lang.name)
+                                                  }
+                                                , { header = Style.tableHeader (E.text "functions")
+                                                  , width = E.fill
+                                                  , view = \lang -> Style.tableCell (E.text lang.functions)
+                                                  }
+                                                , { header = Style.tableHeader (E.text "methods")
+                                                  , width = E.fill
+                                                  , view = \lang -> Style.tableCell (E.text lang.methods)
+                                                  }
+                                                , { header = Style.tableHeader (E.text "consts/vars")
+                                                  , width = E.fill
+                                                  , view = \lang -> Style.tableCell (E.text lang.constsVars)
+                                                  }
+                                                , { header = Style.tableHeader (E.text "search")
+                                                  , width = E.fill
+                                                  , view = \lang -> Style.tableCell (E.text lang.search)
+                                                  }
+                                                , { header = Style.tableHeader (E.text "usage examples")
+                                                  , width = E.fill
+                                                  , view = \lang -> Style.tableCell (E.text lang.usageExamples)
+                                                  }
+                                                , { header = Style.tableHeader (E.text "code intel")
+                                                  , width = E.fill
+                                                  , view = \lang -> Style.tableCell (E.text lang.codeIntel)
+                                                  }
+                                                ]
+                                            }
                                         ]
 
                                   else
@@ -216,6 +256,54 @@ view cloudMode model =
             )
         ]
     }
+
+
+type alias SupportedLanguage =
+    { name : String
+    , functions : String
+    , methods : String
+    , constsVars : String
+    , search : String
+    , usageExamples : String
+    , codeIntel : String
+    }
+
+
+supportedLanguages : List SupportedLanguage
+supportedLanguages =
+    [ { name = "Go"
+      , functions = "✅"
+      , methods = "❌"
+      , constsVars = "❌"
+      , search = "✅"
+      , usageExamples = "❌"
+      , codeIntel = "❌"
+      }
+    , { name = "Python"
+      , functions = "✅"
+      , methods = "❌"
+      , constsVars = "❌"
+      , search = "✅"
+      , usageExamples = "❌"
+      , codeIntel = "❌"
+      }
+    , { name = "Zig"
+      , functions = "✅"
+      , methods = "partial"
+      , constsVars = "❌"
+      , search = "✅"
+      , usageExamples = "❌"
+      , codeIntel = "❌"
+      }
+    , { name = "Markdown"
+      , functions = "n/a"
+      , methods = "n/a"
+      , constsVars = "❌"
+      , search = "✅"
+      , usageExamples = "❌"
+      , codeIntel = "❌"
+      }
+    ]
 
 
 logo =

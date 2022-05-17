@@ -215,27 +215,32 @@ type AutoIndexedProject struct {
 }
 
 // Runs all the registered language indexes along with the search indexer and stores the results.
+//
+// If an error is returned, it may be the case that some indexers succeeded while others failed.
 func RunIndexers(ctx context.Context, dir string, dataDirFlag, projectFlag *string) error {
+	var err error
+
+	// IndexDir may partially complete, with some indexers succeeding while others fail. In this
+	// case indexes and indexErr are both != nil.
 	indexes, indexErr := IndexDir(ctx, dir)
 	for _, index := range indexes {
 		fmt.Printf("%v: indexed %v files (%v bytes) in %v\n", index.Language.ID, index.NumFiles, index.NumBytes, time.Duration(index.DurationSeconds*float64(time.Second)).Round(time.Millisecond))
 	}
+	if indexErr != nil {
+		err = multierror.Append(err, errors.Wrap(indexErr, "IndexDir"))
+	}
 
+	// Write indexes that we did produce.
 	indexDataDir := filepath.Join(*dataDirFlag, "index")
 	writeErr := WriteIndexes(*projectFlag, indexDataDir, indexes)
-	if indexErr != nil && writeErr != nil {
-		return multierror.Append(indexErr, writeErr)
-	}
-	if indexErr != nil {
-		return indexErr
-	}
 	if writeErr != nil {
-		return writeErr
+		err = multierror.Append(err, errors.Wrap(writeErr, "WriteIndexes"))
 	}
 
-	err := IndexForSearch(*projectFlag, indexDataDir, indexes)
-	if err != nil {
-		return errors.Wrap(err, "IndexForSearch")
+	// Index for search the indexes that we did produce.
+	searchErr := IndexForSearch(*projectFlag, indexDataDir, indexes)
+	if searchErr != nil {
+		err = multierror.Append(err, errors.Wrap(searchErr, "IndexForSearch"))
 	}
-	return nil
+	return err
 }

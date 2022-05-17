@@ -147,3 +147,20 @@ Navigate to http://localhost:3333
 We'd love any contributions!
 
 To get started see [docs/development.md](docs/development.md)
+
+## Changelog
+
+### v0.1 (not yet released)
+
+#### Added
+
+* Go, Python, Zig, and Markdown basic support
+* Basic search navigation experience based on [experimental Sinter search filters](https://github.com/hexops/sinter/blob/c87e502f3cfd468d3d1263b7caf7cea94ff6d084/src/filter.zig#L18-L85)
+* Markdown files now have headers and sub-headers indexed for search (e.g. `# About doctree > Installation` shows up in search)
+* Basic Markdown frontmatter support.
+* Initial [doctree schema format](https://github.com/sourcegraph/doctree/blob/main/doctree/schema/schema.go)
+* Experimental (not yet ready for use) auto-indexing, `doctree add .` to monitor a project for file changes and re-index automatically.
+* Docker images, single-binary downloads for every OS cross-compiled via Zig compiler.
+* Initial [v1.0 roadmap](https://github.com/sourcegraph/doctree/issues/27), [language support tracking issue](https://github.com/sourcegraph/doctree/issues/10)
+
+Special thanks: @KShivendu (Python support)

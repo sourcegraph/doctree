@@ -207,6 +207,9 @@ func (i *zigIndexer) IndexDir(ctx context.Context, dir string) (*schema.Index, e
 
 		// Function definitions
 		{
+			// TODO: This query is incorrectly pulling out methods from nested struct definitions.
+			// So we end up with a flat hierarchy of types - that's very bad. It also means we don't
+			// accurately pick up when a method is part of a parent type.
 			query, err := sitter.NewQuery([]byte(`
 				(
 					(doc_comment)* @func_docs
@@ -253,17 +256,19 @@ func (i *zigIndexer) IndexDir(ctx context.Context, dir string) (*schema.Index, e
 				funcParams := firstCaptureContentOr(content, captures["func_params"], "")
 				funcResult := firstCaptureContentOr(content, captures["func_result"], "")
 
-				searchKey := funcName
 				accessiblePath := deps.fileToAccessiblePath[path]
-				if accessiblePath != "" {
-					searchKey = accessiblePath + "." + funcName
+				var searchKey []string
+				if accessiblePath == "" {
+					searchKey = []string{funcName}
+				} else {
+					searchKey = []string{accessiblePath, ".", funcName}
 				}
 				functionsByFile[path] = append(functionsByFile[path], schema.Section{
 					ID:         funcName,
 					ShortLabel: funcName,
 					Label:      schema.Markdown(funcName + funcParams + " " + funcResult),
 					Detail:     schema.Markdown(docsToMarkdown(funcDocs)),
-					SearchKey:  strings.Split(searchKey, "."),
+					SearchKey:  searchKey,
 				})
 			}
 		}

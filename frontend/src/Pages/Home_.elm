@@ -194,7 +194,10 @@ view cloudMode model =
                                         [ Style.h2 [ E.paddingXY 0 32 ] (E.text "# Your projects")
                                         , E.column [] (projectsList list)
                                         , Style.h2 [ E.paddingXY 0 32 ] (E.text "# Index a project")
-                                        , E.el [ Font.size 16 ] (E.text "$ doctree index -project='foobar' .")
+                                        , E.row [ Font.size 16 ]
+                                            [ E.text "$ "
+                                            , E.text "doctree index ."
+                                            ]
                                         ]
                                 ]
 

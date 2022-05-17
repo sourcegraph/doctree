@@ -217,8 +217,7 @@ func ListenAutoIndexedProjects(dataDirFlag *string) error {
 	}
 
 	// Initialize the fsnotify watcher
-	// TODO: Watch ~/.doctree/autoindex
-	// to re-index newly added projects on the fly?
+	// TODO: Watch ~/.doctree/autoindex to re-index newly added projects on the fly?
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		return err
@@ -228,8 +227,7 @@ func ListenAutoIndexedProjects(dataDirFlag *string) error {
 	// Configure watcher to watch all dirs mentioned in the 'autoindex' file
 	for projectPath := range autoindexedProjects {
 		// Add the project directory to the watcher
-		// TODO: Check if the project changed
-		// while the server wasn't running.
+		// TODO: Check if the project changed while the server wasn't running.
 		err = recursiveWatch(watcher, projectPath)
 		if err != nil {
 			return err

@@ -181,7 +181,7 @@ func Get(indexDataDir, projectName string) (map[string]schema.Index, error) {
 		return nil, errors.Wrap(err, "ReadDir")
 	}
 	for _, info := range dir {
-		if !info.IsDir() && info.Name() != "search-index.sinter" {
+		if !info.IsDir() && info.Name() != "search-index.sinter" && info.Name() != "version" {
 			lang := info.Name()
 
 			f, err := os.Open(filepath.Join(indexDataDir, indexName, lang))

@@ -177,6 +177,10 @@ view cloudMode model =
                                                   , width = E.fill
                                                   , view = \lang -> Style.tableCell (E.text lang.functions)
                                                   }
+                                                , { header = Style.tableHeader (E.text "types")
+                                                  , width = E.fill
+                                                  , view = \lang -> Style.tableCell (E.text lang.types)
+                                                  }
                                                 , { header = Style.tableHeader (E.text "methods")
                                                   , width = E.fill
                                                   , view = \lang -> Style.tableCell (E.text lang.methods)
@@ -226,6 +230,7 @@ view cloudMode model =
 type alias SupportedLanguage =
     { name : String
     , functions : String
+    , types : String
     , methods : String
     , constsVars : String
     , search : String
@@ -238,6 +243,7 @@ supportedLanguages : List SupportedLanguage
 supportedLanguages =
     [ { name = "Go"
       , functions = "✅"
+      , types = "❌"
       , methods = "❌"
       , constsVars = "❌"
       , search = "✅"
@@ -246,6 +252,7 @@ supportedLanguages =
       }
     , { name = "Python"
       , functions = "✅"
+      , types = "❌"
       , methods = "❌"
       , constsVars = "❌"
       , search = "✅"
@@ -254,6 +261,7 @@ supportedLanguages =
       }
     , { name = "Zig"
       , functions = "✅"
+      , types = "❌"
       , methods = "partial"
       , constsVars = "❌"
       , search = "✅"
@@ -262,6 +270,7 @@ supportedLanguages =
       }
     , { name = "Markdown"
       , functions = "n/a"
+      , types = "❌"
       , methods = "n/a"
       , constsVars = "❌"
       , search = "✅"

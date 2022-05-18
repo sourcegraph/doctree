@@ -25,12 +25,12 @@ If you think what we're building is a good idea, we'd love to hear your thoughts
 
 Adding support for more languages is easy. To request support for a language [comment on this issue](https://github.com/sourcegraph/doctree/issues/10)
 
-| language | functions | methods | consts/vars | search | usage examples | code intel |
-|----------|-----------|---------|-------------|--------|----------------|------------|
-| Go       | ✅        | ❌       | ❌          | ✅     | ❌             | ❌          |
-| Python   | ✅        | ❌       | ❌          | ✅     | ❌             | ❌          |
-| Zig      | ✅        | partial | ❌          | ✅     | ❌              | ❌          |
-| Markdown | n/a       | n/a     | n/a         | ✅     | n/a            | n/a        |
+| language | functions | types | methods | consts/vars | search | usage examples | code intel |
+|----------|-----------|-------|---------|-------------|--------|----------------|------------|
+| Go       | ✅        | ❌     | ❌       | ❌          | ✅     | ❌             | ❌          |
+| Python   | ✅        | ❌     | ❌       | ❌          | ✅     | ❌             | ❌          |
+| Zig      | ✅        | ❌     | partial | ❌          | ✅     | ❌              | ❌          |
+| Markdown | n/a       | ❌     | n/a     | n/a         | ✅     | n/a            | n/a        |
 
 ## Installation
 

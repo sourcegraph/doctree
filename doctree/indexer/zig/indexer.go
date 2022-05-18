@@ -3,7 +3,6 @@ package zig
 
 import (
 	"context"
-	"fmt"
 	"io/fs"
 	"os"
 	"path"

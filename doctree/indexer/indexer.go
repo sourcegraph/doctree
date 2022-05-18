@@ -246,5 +246,20 @@ func RunIndexers(ctx context.Context, dir string, dataDirFlag, projectFlag *stri
 		}
 		err = multierror.Append(err, errors.Wrap(searchErr, "IndexForSearch"))
 	}
+
+	// Write a version number file. This enables us in future versions of doctree to, say,
+	// automatically re-index (or just remove) directories from old versions that do not match the
+	// new indexing/schema format.
+	//
+	// The version number is a simple incrementing integer, starting at 1. It has no relation to
+	// doctree release versions.
+	versionErr := os.WriteFile(filepath.Join(projectDir, "version"), []byte("1"), 0o666)
+	if versionErr != nil {
+		if rmErr := os.RemoveAll(projectDir); rmErr != nil {
+			err = multierror.Append(err, errors.Wrap(rmErr, "RemoveAll"))
+		}
+		err = multierror.Append(err, errors.Wrap(searchErr, "WriteFile (version)"))
+	}
+
 	return err
 }

@@ -280,7 +280,7 @@ const dataDirVersion = "1"
 
 func ensureDataDir(dataDir string) error {
 	versionFile := filepath.Join(dataDir, "version")
-	fi, err := os.Stat(versionFile)
+	_, err := os.Stat(versionFile)
 	if os.IsNotExist(err) {
 		// Create the directory if needed.
 		if err := os.MkdirAll(dataDir, os.ModePerm); err != nil {
@@ -292,9 +292,6 @@ func ensureDataDir(dataDir string) error {
 	}
 	if err != nil {
 		return err
-	}
-	if !fi.IsDir() {
-		return errors.New("not a directory")
 	}
 	return nil
 }

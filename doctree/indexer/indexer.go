@@ -238,8 +238,12 @@ func RunIndexers(ctx context.Context, dir string, dataDirFlag, projectFlag *stri
 	}
 
 	// Index for search the indexes that we did produce.
+	projectDir := filepath.Join(indexDataDir, encodeProjectName(*projectFlag))
 	searchErr := IndexForSearch(*projectFlag, indexDataDir, indexes)
 	if searchErr != nil {
+		if rmErr := os.RemoveAll(projectDir); rmErr != nil {
+			err = multierror.Append(err, errors.Wrap(rmErr, "RemoveAll"))
+		}
 		err = multierror.Append(err, errors.Wrap(searchErr, "IndexForSearch"))
 	}
 	return err

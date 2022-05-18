@@ -120,12 +120,14 @@ view cloudMode model =
 
                                   else if cloudMode then
                                     E.column [ E.centerX ]
-                                        [ Style.h2 [ E.paddingXY 0 32 ] (E.text "# Try doctree (sample projects)")
+                                        [ Style.h2 [ E.paddingXY 0 32 ] (E.text "# Try doctree")
                                         , E.column [] (projectsList list)
                                         , Style.h2 [ E.paddingEach { top = 32, right = 0, bottom = 0, left = 0 } ]
                                             (E.text "# Add your repository to doctree.org")
                                         , Style.paragraph [ E.paddingEach { top = 32, right = 0, bottom = 0, left = 0 } ]
-                                            [ E.text "(coming soon)"
+                                            [ E.text "Simply visit e.g. "
+                                            , E.el [ Font.underline ] (E.text "https://doctree.org/github.com/my/repo")
+                                            , E.text " (replace my/repo in the URL with your repository) and the server will clone & index your repository."
                                             ]
                                         , Style.h2 [ E.paddingEach { top = 32, right = 0, bottom = 0, left = 0 } ]
                                             (E.text "# About doctree")

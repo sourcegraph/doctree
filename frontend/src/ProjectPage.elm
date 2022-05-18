@@ -232,7 +232,11 @@ view shared projectURI model =
                         E.layout Style.layout (E.text (httpErrorToString err))
 
             Nothing ->
-                E.layout Style.layout (E.text "loading..")
+                if shared.flags.cloudMode then
+                    E.layout Style.layout (E.text "loading.. (repository may be cloning/indexing which can take up to 120s)")
+
+                else
+                    E.layout Style.layout (E.text "loading..")
         ]
     }
 

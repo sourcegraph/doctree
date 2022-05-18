@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"flag"
@@ -12,7 +13,9 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"syscall"
+	"time"
 
 	"github.com/NYTimes/gziphandler"
 	"github.com/fsnotify/fsnotify"
@@ -146,7 +149,54 @@ func Serve(cloudMode bool, addr, dataDir, indexDataDir string) {
 
 		query := r.URL.Query().Get("query")
 		projectName := r.URL.Query().Get("project")
+
+		// Whether or not this is an autocomplete query. If so, the goal is to find results quickly
+		// enough that they are as-you-type. Otherwise, the intent is to really search - and maybe
+		// we can do a bit more work to find better results.
+		autoComplete, _ := strconv.ParseBool(r.URL.Query().Get("autocomplete"))
+
+		start := time.Now()
 		results, err := indexer.Search(r.Context(), indexDataDir, query, projectName)
+		duration := time.Since(start)
+
+		// If this is not an autocomplete query (ran very quickly), but rather an intentful one
+		// (e.g. the user stopped typing for a full second) then it's a good candidate for logging.
+		//
+		// This is the only way we have to know if people are getting results they want, quickly,
+		// and if we could make the query syntax any nicer / more obvious. The logs are reviewed by
+		// human, it's only turned on for doctree.org, and there is no username/IP/etc associated at
+		// all.
+		if cloudMode && !autoComplete {
+			logProject := projectName
+			if logProject == "" {
+				logProject = "all"
+			}
+			if err != nil {
+				fmt.Printf("search: query error: %v after %vms (project: %s): %s\n", err, duration.Milliseconds(), logProject, query)
+			} else {
+				var buf bytes.Buffer
+				fmt.Fprintf(&buf, "search: found %v results in %vms (project: %s):\n", len(results), duration.Milliseconds(), logProject)
+				fmt.Fprintf(&buf, "\tquery: %s\n", query)
+				max5 := results
+				if len(max5) > 5 {
+					max5 = max5[:5]
+				}
+				for i, result := range max5 {
+					fmt.Fprintf(&buf, "\t%d. %s %s\n", i,
+						result.SearchKey,
+						result.ProjectName,
+					)
+					fmt.Fprintf(&buf, "\t\tlanguage=%s path=%q id=%q score=%f\n",
+						result.Language,
+						result.Path,
+						result.ID,
+						result.Score,
+					)
+				}
+				fmt.Printf("%s", buf.String())
+			}
+		}
+
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}

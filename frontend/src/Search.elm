@@ -21,12 +21,18 @@ debounceQueryInputMillis =
     20
 
 
+debounceQueryIntentInputMillis : Float
+debounceQueryIntentInputMillis =
+    500
+
+
 
 -- INIT
 
 
 type alias Model =
     { debounce : Int
+    , debounceIntent : Int
     , query : String
     , projectName : Maybe String
     , results : Maybe (Result Http.Error (List APISchema.SearchResult))
@@ -36,6 +42,7 @@ type alias Model =
 init : Maybe String -> ( Model, Cmd Msg )
 init projectName =
     ( { debounce = 0
+      , debounceIntent = 0
       , query = ""
       , projectName = projectName
       , results = Nothing
@@ -54,7 +61,8 @@ type Msg
     = FocusOn String
     | OnSearchInput String
     | OnDebounce
-    | RunSearch
+    | OnDebounceIntent
+    | RunSearch Bool
     | GotSearchResults (Result Http.Error (List APISchema.SearchResult))
     | NoOp
 
@@ -63,19 +71,33 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         OnSearchInput query ->
-            ( { model | query = query, debounce = model.debounce + 1 }
-            , Task.perform (\_ -> OnDebounce) (Process.sleep debounceQueryInputMillis)
+            ( { model
+                | query = query
+                , debounce = model.debounce + 1
+                , debounceIntent = model.debounceIntent + 1
+              }
+            , Cmd.batch
+                [ Task.perform (\_ -> OnDebounce) (Process.sleep debounceQueryInputMillis)
+                , Task.perform (\_ -> OnDebounceIntent) (Process.sleep debounceQueryIntentInputMillis)
+                ]
             )
 
         OnDebounce ->
             if model.debounce - 1 == 0 then
-                update RunSearch { model | debounce = model.debounce - 1 }
+                update (RunSearch False) { model | debounce = model.debounce - 1 }
 
             else
                 ( { model | debounce = model.debounce - 1 }, Cmd.none )
 
-        RunSearch ->
-            ( model, fetchSearchResults model.query model.projectName )
+        OnDebounceIntent ->
+            if model.debounceIntent - 1 == 0 then
+                update (RunSearch True) { model | debounceIntent = model.debounceIntent - 1 }
+
+            else
+                ( { model | debounceIntent = model.debounceIntent - 1 }, Cmd.none )
+
+        RunSearch intent ->
+            ( model, fetchSearchResults model.query intent model.projectName )
 
         GotSearchResults results ->
             ( { model | results = Just results }, Cmd.none )
@@ -87,16 +109,26 @@ update msg model =
             ( model, Cmd.none )
 
 
-fetchSearchResults : String -> Maybe String -> Cmd Msg
-fetchSearchResults query projectName =
+fetchSearchResults : String -> Bool -> Maybe String -> Cmd Msg
+fetchSearchResults query intent projectName =
     Http.get
         { url =
             Url.Builder.absolute [ "api", "search" ]
                 [ Url.Builder.string "query" query
+                , Url.Builder.string "autocomplete" (boolToString (intent == False))
                 , Url.Builder.string "project" (Maybe.withDefault "" projectName)
                 ]
         , expect = Http.expectJson GotSearchResults (D.list APISchema.searchResultDecoder)
         }
+
+
+boolToString : Bool -> String
+boolToString value =
+    if value then
+        "true"
+
+    else
+        "false"
 
 
 

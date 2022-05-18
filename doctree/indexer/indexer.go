@@ -220,6 +220,11 @@ type AutoIndexedProject struct {
 func RunIndexers(ctx context.Context, dir string, dataDirFlag, projectFlag *string) error {
 	var err error
 
+	// Ensure the doctree data dir exists, and that it has a version file.
+	if err := ensureDataDir(*dataDirFlag); err != nil {
+		return errors.Wrap(err, "ensureDataDir")
+	}
+
 	// IndexDir may partially complete, with some indexers succeeding while others fail. In this
 	// case indexes and indexErr are both != nil.
 	indexes, indexErr := IndexDir(ctx, dir)
@@ -247,13 +252,8 @@ func RunIndexers(ctx context.Context, dir string, dataDirFlag, projectFlag *stri
 		err = multierror.Append(err, errors.Wrap(searchErr, "IndexForSearch"))
 	}
 
-	// Write a version number file. This enables us in future versions of doctree to, say,
-	// automatically re-index (or just remove) directories from old versions that do not match the
-	// new indexing/schema format.
-	//
-	// The version number is a simple incrementing integer, starting at 1. It has no relation to
-	// doctree release versions.
-	versionErr := os.WriteFile(filepath.Join(projectDir, "version"), []byte("1"), 0o666)
+	// Write a version number file.
+	versionErr := os.WriteFile(filepath.Join(projectDir, "version"), []byte(projectDirVersion), 0o666)
 	if versionErr != nil {
 		if rmErr := os.RemoveAll(projectDir); rmErr != nil {
 			err = multierror.Append(err, errors.Wrap(rmErr, "RemoveAll"))
@@ -262,4 +262,39 @@ func RunIndexers(ctx context.Context, dir string, dataDirFlag, projectFlag *stri
 	}
 
 	return err
+}
+
+// The version stored in e.g. ~/.doctree/index/<project>/version - indicating the version of the
+// project directory. If we need to change search indexing, add support for more languages, etc.
+// this file is how we'd determine which directories need to be re-indexed / removed.
+//
+// An incrementing integer. No relation to other version numbers.
+const projectDirVersion = "1"
+
+// The version stored in e.g. ~/.doctree/version - indicating the version of the overall data
+// directory. If we need to change the directory structure in some way, change the autoindex file
+// format, etc. this is what we'd use to determine when to do that.
+//
+// An incrementing integer. No relation to other version numbers.
+const dataDirVersion = "1"
+
+func ensureDataDir(dataDir string) error {
+	versionFile := filepath.Join(dataDir, "version")
+	fi, err := os.Stat(versionFile)
+	if os.IsNotExist(err) {
+		// Create the directory if needed.
+		if err := os.MkdirAll(dataDir, os.ModePerm); err != nil {
+			return errors.Wrap(err, "MkdirAll")
+		}
+
+		// Write the version info.
+		return os.WriteFile(versionFile, []byte(dataDirVersion), 0o666)
+	}
+	if err != nil {
+		return err
+	}
+	if !fi.IsDir() {
+		return errors.New("not a directory")
+	}
+	return nil
 }

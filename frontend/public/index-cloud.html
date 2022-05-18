@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;1,500;1,800&display=swap" rel="stylesheet"> 
+  <link href="/stylesheet.css" rel="stylesheet"> 
+
+  <!--
+    Plausible (https://plausible.io/), "Simple and privacy-friendly Google Analytics alternative"
+    This is ONLY used on doctree.org, never on self-hosted/local instances (which should never
+    contact public internet without permission.) We just use it to see if people are actually using
+    doctree.org and if we should continue developing it.
+
+    You can view the same metrics we do, publicly, here: https://plausible.io/doctree.org
+  -->
+  <script defer data-domain="doctree.org" src="/opendata.js"></script>
+</head>
+<body>
+  <!--
+      HACK: elm-spa thinks requests like /github.com are for a static _file_ because it has an
+      extension (.com) in the path, and so results in "File not found." instead of serving the SPA
+      as we expect. This is a bug in elm-spa. To workaround it, we redirect requests for "/github.com"
+      to "/?/github.com" server-side, then do a window.history.replaceState with "/github.com" for
+      our SPA.
+      This redirecting only occurs in the dev server environment.
+  -->
+  <script type="text/javascript">
+    (function(l) {
+      if (l.search[1] === '/' ) {
+        var decoded = l.search.slice(1).split('&').map(function(s) { 
+          return s.replace(/~and~/g, '&')
+        }).join('?');
+        window.history.replaceState(null, null,
+            l.pathname.slice(0, -1) + decoded + l.hash
+        );
+      }
+    }(window.location))
+  </script>
+
+  <script src="/dist/elm.js"></script>
+  <script src="/main.js"></script>
+</body>
+</html>

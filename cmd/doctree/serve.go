@@ -79,7 +79,7 @@ Examples:
 func Serve(cloudMode bool, addr, indexDataDir string) {
 	log.Printf("Listening on %s", addr)
 	mux := http.NewServeMux()
-	mux.Handle("/", frontendHandler())
+	mux.Handle("/", frontendHandler(cloudMode))
 	mux.Handle("/main.js", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		flags := struct {
 			CloudMode bool `json:"cloudMode"`
@@ -166,7 +166,7 @@ func Serve(cloudMode bool, addr, indexDataDir string) {
 	}
 }
 
-func frontendHandler() http.Handler {
+func frontendHandler(cloudMode bool) http.Handler {
 	if debugServer := os.Getenv("ELM_DEBUG_SERVER"); debugServer != "" {
 		// Reverse proxy to the elm-spa debug server for hot code reloading, etc.
 		remote, err := url.Parse(debugServer)
@@ -187,6 +187,10 @@ func frontendHandler() http.Handler {
 				req.URL.RawQuery = req.URL.Path + "&" + queryParams
 				req.URL.Path = "/"
 			}
+
+			if cloudMode && req.URL.Path == "/" {
+				req.URL.Path = "/index-cloud.html"
+			}
 		}
 		return proxy
 	}
@@ -203,6 +207,10 @@ func frontendHandler() http.Handler {
 			req.URL.Path = "/"
 		} else {
 			f.Close()
+		}
+
+		if cloudMode && req.URL.Path == "/" {
+			req.URL.Path = "/index-cloud.html"
 		}
 
 		fileServer.ServeHTTP(w, req)

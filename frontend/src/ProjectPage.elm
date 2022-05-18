@@ -10,7 +10,7 @@ import Element.Font as Font
 import Element.Region as Region
 import Gen.Params.NotFound exposing (Params)
 import Html exposing (Html)
-import Html.Attributes exposing (style)
+import Html.Attributes
 import Markdown
 import Page
 import Process

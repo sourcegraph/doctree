@@ -1,31 +1,18 @@
 module Pages.Home_ exposing (Model, Msg, page)
 
-import APISchema
-import Browser.Dom
 import Element as E
-import Element.Border as Border
 import Element.Font as Font
 import Element.Lazy
 import Gen.Params.Home_ exposing (Params)
-import Html
-import Html.Attributes
-import Html.Events
 import Http
 import Json.Decode as D
 import Page
-import Process
 import Request
+import Search
 import Shared
 import Style
-import Task
-import Url.Builder
 import Util exposing (httpErrorToString)
 import View exposing (View)
-
-
-debounceQueryInputMillis : Float
-debounceQueryInputMillis =
-    20
 
 
 page : Shared.Model -> Request.With Params -> Page.With Model Msg
@@ -44,24 +31,22 @@ page shared req =
 
 type alias Model =
     { list : Maybe (Result Http.Error (List String))
-    , debounce : Int
-    , query : String
-    , results : Maybe (Result Http.Error (List APISchema.SearchResult))
+    , search : Search.Model
     }
 
 
 init : ( Model, Cmd Msg )
 init =
+    let
+        ( searchModel, searchCmd ) =
+            Search.init
+    in
     ( { list = Nothing
-      , debounce = 0
-      , query = ""
-      , results = Nothing
+      , search = searchModel
       }
     , Cmd.batch
         [ fetchList
-        , Task.perform
-            (\_ -> FocusOn "search-input")
-            (Process.sleep 100)
+        , Cmd.map (\v -> SearchMsg v) searchCmd
         ]
     )
 
@@ -72,12 +57,7 @@ init =
 
 type Msg
     = GotList (Result Http.Error (List String))
-    | FocusOn String
-    | OnSearchInput String
-    | OnDebounce
-    | RunSearch
-    | GotSearchResults (Result Http.Error (List APISchema.SearchResult))
-    | NoOp
+    | SearchMsg Search.Msg
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -86,29 +66,14 @@ update msg model =
         GotList list ->
             ( { model | list = Just list }, Cmd.none )
 
-        OnSearchInput query ->
-            ( { model | query = query, debounce = model.debounce + 1 }
-            , Task.perform (\_ -> OnDebounce) (Process.sleep debounceQueryInputMillis)
+        SearchMsg searchMsg ->
+            let
+                ( searchModel, searchCmd ) =
+                    Search.update searchMsg model.search
+            in
+            ( { model | search = searchModel }
+            , Cmd.map (\v -> SearchMsg v) searchCmd
             )
-
-        OnDebounce ->
-            if model.debounce - 1 == 0 then
-                update RunSearch { model | debounce = model.debounce - 1 }
-
-            else
-                ( { model | debounce = model.debounce - 1 }, Cmd.none )
-
-        RunSearch ->
-            ( model, fetchSearchResults model.query )
-
-        GotSearchResults results ->
-            ( { model | results = Just results }, Cmd.none )
-
-        FocusOn id ->
-            ( model, Browser.Dom.focus id |> Task.attempt (\_ -> NoOp) )
-
-        NoOp ->
-            ( model, Cmd.none )
 
 
 fetchList : Cmd Msg
@@ -116,14 +81,6 @@ fetchList =
     Http.get
         { url = "/api/list"
         , expect = Http.expectJson GotList (D.list D.string)
-        }
-
-
-fetchSearchResults : String -> Cmd Msg
-fetchSearchResults query =
-    Http.get
-        { url = Url.Builder.absolute [ "api", "search" ] [ Url.Builder.string "query" query ]
-        , expect = Http.expectJson GotSearchResults (D.list APISchema.searchResultDecoder)
         }
 
 
@@ -151,9 +108,11 @@ view cloudMode model =
                         Ok list ->
                             E.column [ E.centerX, E.width (E.fill |> E.maximum 700), E.paddingXY 0 64 ]
                                 [ logo
-                                , searchInput
-                                , if model.query /= "" then
-                                    Element.Lazy.lazy searchResults model.results
+                                , E.map (\v -> SearchMsg v) Search.searchInput
+                                , if model.search.query /= "" then
+                                    Element.Lazy.lazy
+                                        (\results -> E.map (\v -> SearchMsg v) (Search.searchResults results))
+                                        model.search.results
 
                                   else if cloudMode then
                                     E.column [ E.centerX ]
@@ -334,80 +293,3 @@ projectsList list =
                 }
         )
         list
-
-
-searchInput =
-    E.html
-        (Html.input
-            [ Html.Attributes.type_ "text"
-            , Html.Attributes.autofocus True
-            , Html.Attributes.id "search-input"
-            , Html.Attributes.placeholder "http.ListenAndServe"
-            , Html.Attributes.style "font-size" "16px"
-            , Html.Attributes.style "font-family" "JetBrains Mono, monospace"
-            , Html.Attributes.style "padding" "0.5rem"
-            , Html.Attributes.style "width" "100%"
-            , Html.Attributes.style "margin-top" "4rem"
-            , Html.Attributes.style "margin-bottom" "2rem"
-            , Html.Events.onInput OnSearchInput
-            ]
-            []
-        )
-
-
-searchResults : Maybe (Result Http.Error (List APISchema.SearchResult)) -> E.Element msg
-searchResults request =
-    case request of
-        Just response ->
-            case response of
-                Ok results ->
-                    E.column [ E.width E.fill ]
-                        (List.map
-                            (\r ->
-                                E.row
-                                    [ E.width E.fill
-                                    , E.paddingXY 0 8
-                                    , Border.color (E.rgb255 210 210 210)
-                                    , Border.widthEach { top = 0, left = 0, bottom = 1, right = 0 }
-                                    ]
-                                    [ E.column []
-                                        [ E.link [ E.paddingEach { top = 0, right = 0, bottom = 4, left = 0 } ]
-                                            { url = Url.Builder.absolute [ r.projectName, "-", r.language, "-", r.path ] [ Url.Builder.string "id" r.id ]
-                                            , label = E.el [ Font.underline ] (E.text r.searchKey)
-                                            }
-                                        , E.el
-                                            [ Font.color (E.rgb 0.6 0.6 0.6)
-                                            , Font.size 14
-                                            ]
-                                            (E.text (shortProjectName r.path))
-                                        ]
-                                    , E.el
-                                        [ E.alignRight
-                                        , Font.color (E.rgb 0.6 0.6 0.6)
-                                        , Font.size 14
-                                        ]
-                                        (E.text (shortProjectName r.projectName))
-                                    ]
-                            )
-                            results
-                        )
-
-                Err err ->
-                    E.text (httpErrorToString err)
-
-        Nothing ->
-            E.text "loading.."
-
-
-shortProjectName : String -> String
-shortProjectName name =
-    trimPrefix name "github.com/"
-
-
-trimPrefix : String -> String -> String
-trimPrefix str prefix =
-    if String.startsWith prefix str then
-        String.dropLeft (String.length prefix) str
-
-    else
-        str

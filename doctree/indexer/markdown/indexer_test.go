@@ -393,6 +393,7 @@ yay
 // license that can be found in the LICENSE file.
 -->
 `),
+		// TODO: Should be first header in the file
 		SearchKey: []string{
 			"#",
 			" ",
@@ -404,8 +405,6 @@ yay
 			Detail:     schema.Markdown("\ncmd/compile contains the main packages\n"),
 			SearchKey: []string{
 				"#",
-				" ",
-				">", // BUG: "# > Introduction" should be just "# Introduction"
 				" ",
 				"Introduction",
 				" ",
@@ -424,8 +423,6 @@ yay
 				Detail:     schema.Markdown("\nyay\n\n"),
 				SearchKey: []string{
 					"#",
-					" ",
-					">",
 					" ",
 					"1.",
 					" ",

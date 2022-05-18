@@ -157,7 +157,7 @@ func markdownToSections(content []byte, level int, pageTitle string) ([]byte, []
 			continue
 		}
 
-		if level == 1 && firstHeaderName == "" {
+		if (level == 1) && firstHeaderName == "" {
 			// This is the first header in a document. Elevate it out.
 			firstHeaderName = name
 			if pageTitle == "" {
@@ -179,12 +179,17 @@ func markdownToSections(content []byte, level int, pageTitle string) ([]byte, []
 			pageTitle,
 		)
 
+		searchKey := headerSearchKey(pageTitle, name)
+		if pageTitle == "" {
+			searchKey = headerSearchKey(name, "")
+		}
+
 		sections = append(sections, schema.Section{
 			ID:         name,
 			ShortLabel: name,
 			Label:      schema.Markdown(name),
 			Detail:     schema.Markdown(subPrimaryContent),
-			SearchKey:  headerSearchKey(pageTitle, name),
+			SearchKey:  searchKey,
 			Children:   subChildrenSections,
 		})
 	}

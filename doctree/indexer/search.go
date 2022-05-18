@@ -123,6 +123,9 @@ func IndexForSearch(projectName, indexDataDir string, indexes map[string]*schema
 }
 
 func Search(ctx context.Context, indexDataDir, query, projectName string) ([]Result, error) {
+	query, language := parseQuery(query)
+
+	// TODO: could skip sinter filter indexes from projects without our desired language.
 	var indexes []string
 	if projectName == "" {
 		dir, err := ioutil.ReadDir(indexDataDir)
@@ -145,6 +148,16 @@ func Search(ctx context.Context, indexDataDir, query, projectName string) ([]Res
 		))
 	}
 
+	queryKey := strings.FieldsFunc(query, func(r rune) bool { return r == '.' || r == '/' || r == ' ' })
+	queryKeyHashes := []uint64{}
+	for _, part := range queryKey {
+		queryKeyHashes = append(queryKeyHashes, hash(part))
+	}
+	if len(queryKeyHashes) == 0 {
+		// TODO: make QueryLogicalOr handle empty keys set
+		queryKeyHashes = []uint64{hash(query)}
+	}
+
 	// TODO: return stats about search performance, etc.
 	// TODO: query limiting support
 	// TODO: support filtering to specific project
@@ -158,16 +171,6 @@ func Search(ctx context.Context, indexDataDir, query, projectName string) ([]Res
 			continue
 		}
 
-		queryKey := strings.FieldsFunc(query, func(r rune) bool { return r == '.' || r == '/' || r == ' ' })
-		queryKeyHashes := []uint64{}
-		for _, part := range queryKey {
-			queryKeyHashes = append(queryKeyHashes, hash(part))
-		}
-		if len(queryKeyHashes) == 0 {
-			// TODO: make QueryLogicalOr handle empty keys set
-			queryKeyHashes = []uint64{hash(query)}
-		}
-
 		results, err := sinterFilter.QueryLogicalOr(queryKeyHashes)
 		if err != nil {
 			log.Println("error searching", sinterFile, "QueryLogicalOr:", err)
@@ -175,7 +178,7 @@ func Search(ctx context.Context, indexDataDir, query, projectName string) ([]Res
 		}
 		defer results.Deinit()
 
-		out = append(out, decodeResults(results, queryKey, rankedResultLimit-len(out))...)
+		out = append(out, decodeResults(results, queryKey, language, rankedResultLimit-len(out))...)
 		if len(out) >= rankedResultLimit {
 			break
 		}
@@ -185,6 +188,53 @@ func Search(ctx context.Context, indexDataDir, query, projectName string) ([]Res
 		out = out[:limit]
 	}
 	return out, nil
+}
+
+var languageSearchTerms = map[string]schema.Language{
+	"cpp":        schema.LanguageCpp,
+	"c++":        schema.LanguageCpp,
+	"cxx":        schema.LanguageCpp,
+	"go":         schema.LanguageGo,
+	"golang":     schema.LanguageGo,
+	"java":       schema.LanguageJava,
+	"objc":       schema.LanguageObjC,
+	"python":     schema.LanguagePython,
+	"py":         schema.LanguagePython,
+	"typescript": schema.LanguageTypeScript,
+	"ts":         schema.LanguageTypeScript,
+	"zig":        schema.LanguageZig,
+	"ziglang":    schema.LanguageZig,
+	"markdown":   schema.LanguageMarkdown,
+	"md":         schema.LanguageMarkdown,
+}
+
+// Examples:
+//
+//   "foo bar" -> ("foo bar", nil)
+//   "gofoo bar" -> ("gofoo bar", nil)
+//
+//   "go foo bar" -> ("foo bar", schema.LanguageGo)
+//   "foo bar c++" -> ("foo bar", schema.LanguageCpp)
+//
+//   "go foo bar java" -> ("foo bar java", schema.LanguageGo)
+//   " go foo bar" -> ("go foo bar", nil)
+//   "foo bar java " -> ("foo bar java", nil)
+//
+func parseQuery(query string) (realQuery string, language *schema.Language) {
+	// If the query starts with a known language term, we use that first.
+	for term, lang := range languageSearchTerms {
+		if strings.HasPrefix(query, term+" ") {
+			return strings.TrimPrefix(query, term+" "), &lang
+		}
+	}
+
+	// Secondarily, if the query ends with a known language term we use that.
+	for term, lang := range languageSearchTerms {
+		if strings.HasSuffix(query, " "+term) {
+			return strings.TrimSuffix(query, " "+term), &lang
+		}
+	}
+	return query, nil
 }
 
 type Result struct {
@@ -204,7 +254,7 @@ type sinterResult struct {
 	Path        string     `json:"path"`
 }
 
-func decodeResults(results sinter.FilterResults, queryKey []string, limit int) []Result {
+func decodeResults(results sinter.FilterResults, queryKey []string, language *schema.Language, limit int) []Result {
 	var out []Result
 decoding:
 	for i := 0; i < results.Len(); i++ {
@@ -214,6 +264,9 @@ decoding:
 			panic("illegal sinter result value: " + err.Error())
 		}
 
+		if language != nil && result.Language != language.ID {
+			continue
+		}
 		for index, searchKey := range result.SearchKeys {
 			absoluteKey := append([]string{result.Language, result.ProjectName}, searchKey...)
 			score := match(queryKey, absoluteKey)

@@ -151,6 +151,7 @@ To get started see [docs/development.md](docs/development.md) and the [language 
 * Go, Python, Zig, and Markdown basic support
 * Basic search navigation experience based on [experimental Sinter search filters](https://github.com/hexops/sinter/blob/c87e502f3cfd468d3d1263b7caf7cea94ff6d084/src/filter.zig#L18-L85)
 * Searching globally across all projects, and within specific projects is now possible.
+* Searching within a specific language is now supported (add "go", "python", "md" / "markdown" to front of your query string.)
 * Markdown files now have headers and sub-headers indexed for search (e.g. `# About doctree > Installation` shows up in search)
 * Basic Markdown frontmatter support.
 * Initial [doctree schema format](https://github.com/sourcegraph/doctree/blob/main/doctree/schema/schema.go)

@@ -28,14 +28,16 @@ debounceQueryInputMillis =
 type alias Model =
     { debounce : Int
     , query : String
+    , projectName : Maybe String
     , results : Maybe (Result Http.Error (List APISchema.SearchResult))
     }
 
 
-init : ( Model, Cmd Msg )
-init =
+init : Maybe String -> ( Model, Cmd Msg )
+init projectName =
     ( { debounce = 0
       , query = ""
+      , projectName = projectName
       , results = Nothing
       }
     , Task.perform
@@ -73,7 +75,7 @@ update msg model =
                 ( { model | debounce = model.debounce - 1 }, Cmd.none )
 
         RunSearch ->
-            ( model, fetchSearchResults model.query )
+            ( model, fetchSearchResults model.query model.projectName )
 
         GotSearchResults results ->
             ( { model | results = Just results }, Cmd.none )
@@ -85,10 +87,14 @@ update msg model =
             ( model, Cmd.none )
 
 
-fetchSearchResults : String -> Cmd Msg
-fetchSearchResults query =
+fetchSearchResults : String -> Maybe String -> Cmd Msg
+fetchSearchResults query projectName =
     Http.get
-        { url = Url.Builder.absolute [ "api", "search" ] [ Url.Builder.string "query" query ]
+        { url =
+            Url.Builder.absolute [ "api", "search" ]
+                [ Url.Builder.string "query" query
+                , Url.Builder.string "project" (Maybe.withDefault "" projectName)
+                ]
         , expect = Http.expectJson GotSearchResults (D.list APISchema.searchResultDecoder)
         }
 
@@ -108,7 +114,6 @@ searchInput =
             , Html.Attributes.style "font-family" "JetBrains Mono, monospace"
             , Html.Attributes.style "padding" "0.5rem"
             , Html.Attributes.style "width" "100%"
-            , Html.Attributes.style "margin-top" "4rem"
             , Html.Attributes.style "margin-bottom" "2rem"
             , Html.Events.onInput OnSearchInput
             ]

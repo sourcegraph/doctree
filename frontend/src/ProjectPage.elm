@@ -7,6 +7,7 @@ import Effect exposing (Effect)
 import Element as E
 import Element.Border as Border
 import Element.Font as Font
+import Element.Lazy
 import Element.Region as Region
 import Gen.Params.NotFound exposing (Params)
 import Html exposing (Html)
@@ -16,6 +17,7 @@ import Page
 import Process
 import Request
 import Schema
+import Search
 import Shared
 import Style
 import Task
@@ -86,27 +88,40 @@ parseProjectURI uri =
 
 
 type alias Model =
-    {}
+    { search : Search.Model
+    }
 
 
 init : Maybe ProjectURI -> Maybe String -> ( Model, Effect Msg )
 init projectURI maybeID =
-    ( {}
-    , case projectURI of
+    case projectURI of
         Just uri ->
-            Effect.batch
-                [ Effect.fromShared (Shared.GetProject (projectURIName uri))
+            let
+                projectName =
+                    projectURIName uri
+
+                ( searchModel, searchCmd ) =
+                    Search.init (Just projectName)
+            in
+            ( { search = searchModel }
+            , Effect.batch
+                [ Effect.fromShared (Shared.GetProject projectName)
                 , case maybeID of
                     Just id ->
                         Effect.fromCmd (scrollIntoViewHack id)
 
                     Nothing ->
                         Effect.none
+                , Effect.fromCmd (Cmd.map (\v -> SearchMsg v) searchCmd)
                 ]
+            )
 
         Nothing ->
-            Effect.none
-    )
+            let
+                ( searchModel, searchCmd ) =
+                    Search.init Nothing
+            in
+            ( { search = searchModel }, Effect.fromCmd (Cmd.map (\v -> SearchMsg v) searchCmd) )
 
 
 {-| HACK to workaround <https://elmlang.slack.com/archives/C192T0Q1E/p1652407639492269>
@@ -154,6 +169,7 @@ projectURIName projectURI =
 
 type Msg
     = NoOp
+    | SearchMsg Search.Msg
 
 
 update : Msg -> Model -> ( Model, Effect Msg )
@@ -161,6 +177,15 @@ update msg model =
     case msg of
         NoOp ->
             ( model, Effect.none )
+
+        SearchMsg searchMsg ->
+            let
+                ( searchModel, searchCmd ) =
+                    Search.update searchMsg model.search
+            in
+            ( { model | search = searchModel }
+            , Effect.fromCmd (Cmd.map (\v -> SearchMsg v) searchCmd)
+            )
 
 
 
@@ -215,30 +240,41 @@ view shared projectURI model =
 viewName : Model -> APISchema.ProjectIndexes -> String -> Html Msg
 viewName model projectIndexes projectName =
     E.layout (List.concat [ Style.layout, [ E.width E.fill ] ])
-        (E.column [ E.centerX, E.paddingXY 0 32 ]
+        (E.column [ E.centerX, E.width (E.fill |> E.maximum 700), E.paddingXY 0 64 ]
             [ E.row []
                 [ E.link [] { url = "/", label = logo }
                 , E.el [ Region.heading 1, Font.size 24 ] (E.text (String.concat [ " / ", projectName ]))
                 ]
             , Style.h3 [ E.paddingEach { top = 32, right = 0, bottom = 32, left = 0 } ]
-                (E.text "# Documentation by language")
-            , E.row []
-                (List.map
-                    (\language ->
-                        E.link
-                            [ Font.underline
-                            , E.paddingXY 16 16
-                            , Border.color (E.rgb255 210 210 210)
-                            , Border.widthEach { top = 6, left = 6, bottom = 6, right = 6 }
-                            ]
-                            { url =
-                                String.concat
-                                    [ Url.Builder.absolute [ projectName, "-", language ] [] ]
-                            , label = E.text language
-                            }
-                    )
-                    (Dict.keys projectIndexes)
-                )
+                (E.text (String.concat [ "# Search ", Search.shortProjectName projectName ]))
+            , E.map (\v -> SearchMsg v) Search.searchInput
+            , if model.search.query /= "" then
+                Element.Lazy.lazy
+                    (\results -> E.map (\v -> SearchMsg v) (Search.searchResults results))
+                    model.search.results
+
+              else
+                E.column [ E.alignLeft ]
+                    [ Style.h3 [ E.paddingEach { top = 32, right = 0, bottom = 32, left = 0 } ]
+                        (E.text "# Browse docs by language")
+                    , E.row []
+                        (List.map
+                            (\language ->
+                                E.link
+                                    [ Font.underline
+                                    , E.paddingXY 16 16
+                                    , Border.color (E.rgb255 210 210 210)
+                                    , Border.widthEach { top = 6, left = 6, bottom = 6, right = 6 }
+                                    ]
+                                    { url =
+                                        String.concat
+                                            [ Url.Builder.absolute [ projectName, "-", language ] [] ]
+                                    , label = E.text language
+                                    }
+                            )
+                            (Dict.keys projectIndexes)
+                        )
+                    ]
             ]
         )
 

@@ -39,7 +39,7 @@ init : ( Model, Cmd Msg )
 init =
     let
         ( searchModel, searchCmd ) =
-            Search.init
+            Search.init Nothing
     in
     ( { list = Nothing
       , search = searchModel
@@ -108,7 +108,11 @@ view cloudMode model =
                         Ok list ->
                             E.column [ E.centerX, E.width (E.fill |> E.maximum 700), E.paddingXY 0 64 ]
                                 [ logo
-                                , E.map (\v -> SearchMsg v) Search.searchInput
+                                , E.el
+                                    [ E.paddingEach { top = 64, right = 0, bottom = 0, left = 0 }
+                                    , E.width E.fill
+                                    ]
+                                    (E.map (\v -> SearchMsg v) Search.searchInput)
                                 , if model.search.query /= "" then
                                     Element.Lazy.lazy
                                         (\results -> E.map (\v -> SearchMsg v) (Search.searchResults results))

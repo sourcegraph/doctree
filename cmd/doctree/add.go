@@ -59,7 +59,7 @@ Examples:
 
 		// Run indexers on the newly registered dir
 		ctx := context.Background()
-		return indexer.RunIndexers(ctx, projectPath, dataDirFlag, projectFlag)
+		return indexer.RunIndexers(ctx, projectPath, *dataDirFlag, *projectFlag)
 	}
 
 	// Register the command.

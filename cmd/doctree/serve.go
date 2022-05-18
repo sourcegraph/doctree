@@ -50,7 +50,7 @@ Examples:
 		signals := make(chan os.Signal, 1)
 		signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
 
-		go Serve(*cloudModeFlag, *httpFlag, indexDataDir)
+		go Serve(*cloudModeFlag, *httpFlag, *dataDirFlag, indexDataDir)
 		go func() {
 			err := ListenAutoIndexedProjects(dataDirFlag)
 			if err != nil {
@@ -76,7 +76,7 @@ Examples:
 }
 
 // Serve an HTTP server on the given addr.
-func Serve(cloudMode bool, addr, indexDataDir string) {
+func Serve(cloudMode bool, addr, dataDir, indexDataDir string) {
 	log.Printf("Listening on %s", addr)
 	mux := http.NewServeMux()
 	mux.Handle("/", frontendHandler(cloudMode))
@@ -122,7 +122,8 @@ func Serve(cloudMode bool, addr, indexDataDir string) {
 		w.Header().Set("Content-Type", "application/json")
 
 		projectName := r.URL.Query().Get("name")
-		projectIndexes, err := indexer.Get(indexDataDir, projectName)
+
+		projectIndexes, err := indexer.Get(r.Context(), dataDir, indexDataDir, projectName, cloudMode)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -269,7 +270,7 @@ func ListenAutoIndexedProjects(dataDirFlag *string) error {
 							log.Println(err)
 							return
 						}
-						err := indexer.RunIndexers(ctx, projectPath, dataDirFlag, &project.Name)
+						err := indexer.RunIndexers(ctx, projectPath, *dataDirFlag, project.Name)
 						if err != nil {
 							log.Fatal(err)
 						}

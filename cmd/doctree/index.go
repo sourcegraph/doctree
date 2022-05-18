@@ -43,7 +43,7 @@ Examples:
 		}
 
 		ctx := context.Background()
-		return indexer.RunIndexers(ctx, dir, dataDirFlag, projectFlag)
+		return indexer.RunIndexers(ctx, dir, *dataDirFlag, *projectFlag)
 	}
 
 	// Register the command.

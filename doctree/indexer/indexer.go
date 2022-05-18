@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"io/fs"
 	"io/ioutil"
+	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -169,7 +171,11 @@ func List(indexDataDir string) ([]string, error) {
 }
 
 // Get gets all the language indexes for the specified project.
-func Get(indexDataDir, projectName string) (map[string]schema.Index, error) {
+//
+// When autoCloneMissing is true, if the project does not exist the server will attempt to
+// `git clone <projectName> and index it. Beware, this may not be safe to enable if you have Git
+// configured to access private repositories and the server is public!
+func Get(ctx context.Context, dataDir, indexDataDir, projectName string, autoCloneMissing bool) (map[string]schema.Index, error) {
 	indexName := encodeProjectName(projectName)
 	if strings.Contains(indexName, "/") || strings.Contains(indexName, "..") {
 		return nil, errors.New("potentially malicious index name (this is likely a bug)")
@@ -177,6 +183,17 @@ func Get(indexDataDir, projectName string) (map[string]schema.Index, error) {
 
 	indexes := map[string]schema.Index{}
 	dir, err := ioutil.ReadDir(filepath.Join(indexDataDir, indexName))
+	if os.IsNotExist(err) {
+		if autoCloneMissing {
+			repositoryURL := "https://" + projectName
+			log.Println("cloning", repositoryURL)
+			if err := cloneAndIndex(ctx, repositoryURL, dataDir); err != nil {
+				log.Println("failed to clone", repositoryURL, "error:", err)
+				return nil, errors.Wrap(err, "cloneAndIndex")
+			}
+			return Get(ctx, dataDir, indexDataDir, projectName, false)
+		}
+	}
 	if err != nil {
 		return nil, errors.Wrap(err, "ReadDir")
 	}
@@ -201,6 +218,30 @@ func Get(indexDataDir, projectName string) (map[string]schema.Index, error) {
 	return indexes, nil
 }
 
+func cloneAndIndex(ctx context.Context, repositoryURL, dataDir string) error {
+	// Clone the repository into a temp dir.
+	dir, err := os.MkdirTemp(os.TempDir(), "doctree-clone")
+	if err != nil {
+		return errors.Wrap(err, "TempDir")
+	}
+	defer os.RemoveAll(dir)
+
+	cmd := exec.CommandContext(ctx, "git", "clone", "--depth=1", repositoryURL, "repo/")
+	cmd.Dir = dir
+
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("git %s: %v\n%s", strings.Join(cmd.Args, " "), err, out)
+	}
+
+	// Index the repository.
+	projectName := strings.TrimPrefix(repositoryURL, "https://")
+	if err := RunIndexers(ctx, filepath.Join(dir, "repo"), dataDir, projectName); err != nil {
+		return errors.Wrap(err, "RunIndexers")
+	}
+	return err
+}
+
 func encodeProjectName(name string) string {
 	return strings.ReplaceAll(name, "/", "---")
 }
@@ -217,11 +258,11 @@ type AutoIndexedProject struct {
 // Runs all the registered language indexes along with the search indexer and stores the results.
 //
 // If an error is returned, it may be the case that some indexers succeeded while others failed.
-func RunIndexers(ctx context.Context, dir string, dataDirFlag, projectFlag *string) error {
+func RunIndexers(ctx context.Context, dir, dataDir, projectName string) error {
 	var err error
 
 	// Ensure the doctree data dir exists, and that it has a version file.
-	if err := ensureDataDir(*dataDirFlag); err != nil {
+	if err := ensureDataDir(dataDir); err != nil {
 		return errors.Wrap(err, "ensureDataDir")
 	}
 
@@ -236,15 +277,15 @@ func RunIndexers(ctx context.Context, dir string, dataDirFlag, projectFlag *stri
 	}
 
 	// Write indexes that we did produce.
-	indexDataDir := filepath.Join(*dataDirFlag, "index")
-	writeErr := WriteIndexes(*projectFlag, indexDataDir, indexes)
+	indexDataDir := filepath.Join(dataDir, "index")
+	writeErr := WriteIndexes(projectName, indexDataDir, indexes)
 	if writeErr != nil {
 		err = multierror.Append(err, errors.Wrap(writeErr, "WriteIndexes"))
 	}
 
 	// Index for search the indexes that we did produce.
-	projectDir := filepath.Join(indexDataDir, encodeProjectName(*projectFlag))
-	searchErr := IndexForSearch(*projectFlag, indexDataDir, indexes)
+	projectDir := filepath.Join(indexDataDir, encodeProjectName(projectName))
+	searchErr := IndexForSearch(projectName, indexDataDir, indexes)
 	if searchErr != nil {
 		if rmErr := os.RemoveAll(projectDir); rmErr != nil {
 			err = multierror.Append(err, errors.Wrap(rmErr, "RemoveAll"))

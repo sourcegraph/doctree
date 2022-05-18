@@ -367,3 +367,72 @@ a
 		},
 	}).Equal(t, page)
 }
+
+func Test_markdownToPage_starting_on_level_2(t *testing.T) {
+	// Modeled after https://raw.githubusercontent.com/golang/go/master/src/cmd/compile/README.md
+	page := markdownToPage([]byte(`<!---
+// Copyright 2018 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+-->
+
+## Introduction to the Go compiler
+
+cmd/compile contains the main packages
+
+### 1. Parsing
+
+yay
+
+`), "README.md")
+
+	autogold.Want("simple", schema.Page{
+		Path: "README.md", Title: "README.md", Detail: schema.Markdown(`<!---
+// Copyright 2018 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+-->
+`),
+		SearchKey: []string{
+			"#",
+			" ",
+		},
+		Sections: []schema.Section{{
+			ID:         "Introduction to the Go compiler",
+			ShortLabel: "Introduction to the Go compiler",
+			Label:      schema.Markdown("Introduction to the Go compiler"),
+			Detail:     schema.Markdown("\ncmd/compile contains the main packages\n"),
+			SearchKey: []string{
+				"#",
+				" ",
+				">", // BUG: "# > Introduction" should be just "# Introduction"
+				" ",
+				"Introduction",
+				" ",
+				"to",
+				" ",
+				"the",
+				" ",
+				"Go",
+				" ",
+				"compiler",
+			},
+			Children: []schema.Section{{
+				ID:         "1. Parsing",
+				ShortLabel: "1. Parsing",
+				Label:      schema.Markdown("1. Parsing"),
+				Detail:     schema.Markdown("\nyay\n\n"),
+				SearchKey: []string{
+					"#",
+					" ",
+					">",
+					" ",
+					"1.",
+					" ",
+					"Parsing",
+				},
+				Children: []schema.Section{},
+			}},
+		}},
+	}).Equal(t, page)
+}

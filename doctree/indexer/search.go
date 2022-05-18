@@ -122,19 +122,27 @@ func IndexForSearch(projectName, indexDataDir string, indexes map[string]*schema
 	return nil
 }
 
-func Search(ctx context.Context, indexDataDir, query string) ([]Result, error) {
-	dir, err := ioutil.ReadDir(indexDataDir)
-	if os.IsNotExist(err) {
-		return []Result{}, nil
-	}
-	if err != nil {
-		return nil, errors.Wrap(err, "ReadDir")
-	}
+func Search(ctx context.Context, indexDataDir, query, projectName string) ([]Result, error) {
 	var indexes []string
-	for _, info := range dir {
-		if info.IsDir() {
-			indexes = append(indexes, filepath.Join(indexDataDir, info.Name(), "search-index.sinter"))
+	if projectName == "" {
+		dir, err := ioutil.ReadDir(indexDataDir)
+		if os.IsNotExist(err) {
+			return []Result{}, nil
 		}
+		if err != nil {
+			return nil, errors.Wrap(err, "ReadDir")
+		}
+		for _, info := range dir {
+			if info.IsDir() {
+				indexes = append(indexes, filepath.Join(indexDataDir, info.Name(), "search-index.sinter"))
+			}
+		}
+	} else {
+		indexes = append(indexes, filepath.Join(
+			indexDataDir,
+			encodeProjectName(projectName),
+			"search-index.sinter",
+		))
 	}
 
 	// TODO: return stats about search performance, etc.

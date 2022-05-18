@@ -29,6 +29,7 @@ Examples:
 	// Parse flags for our subcommand.
 	flagSet := flag.NewFlagSet("search", flag.ExitOnError)
 	dataDirFlag := flagSet.String("data-dir", defaultDataDir(), "where doctree stores its data")
+	projectNameFlag := flagSet.String("project", "", "search in a specific project")
 
 	// Handles calls to our subcommand.
 	handler := func(args []string) error {
@@ -40,10 +41,12 @@ Examples:
 
 		ctx := context.Background()
 		indexDataDir := filepath.Join(*dataDirFlag, "index")
-		_, err := indexer.Search(ctx, indexDataDir, query)
+		_, err := indexer.Search(ctx, indexDataDir, query, *projectNameFlag)
 		if err != nil {
 			return errors.Wrap(err, "Search")
 		}
+
+		// TODO: CLI interface for search! Print the results here at least :)
 		return nil
 	}
 

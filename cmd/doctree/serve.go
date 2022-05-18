@@ -144,7 +144,8 @@ func Serve(cloudMode bool, addr, indexDataDir string) {
 		w.Header().Set("Content-Type", "application/json")
 
 		query := r.URL.Query().Get("query")
-		results, err := indexer.Search(r.Context(), indexDataDir, query)
+		projectName := r.URL.Query().Get("project")
+		results, err := indexer.Search(r.Context(), indexDataDir, query, projectName)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}

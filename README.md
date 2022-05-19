@@ -144,7 +144,7 @@ To get started see [docs/development.md](docs/development.md) and the [language 
 
 ## Changelog
 
-### v0.1 (not yet released)
+### v0.1
 
 #### Added
 

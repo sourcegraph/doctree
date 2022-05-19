@@ -27,7 +27,7 @@ Adding support for more languages is easy. To request support for a language [co
 
 | language | functions | types | methods | consts/vars | search | usage examples | code intel |
 |----------|-----------|-------|---------|-------------|--------|----------------|------------|
-| Go       | ✅        | ❌     | ❌       | ❌          | ✅     | ❌             | ❌          |
+| Go       | ✅        | ✅     | ❌       | ❌          | ✅     | ❌             | ❌          |
 | Python   | ✅        | ❌     | ❌       | ❌          | ✅     | ❌             | ❌          |
 | Zig      | ✅        | ❌     | partial | ❌          | ✅     | ❌              | ❌          |
 | Markdown | n/a       | ❌     | n/a     | n/a         | ✅     | n/a            | n/a        |

@@ -4,6 +4,7 @@ package golang
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -49,6 +50,7 @@ func (i *goIndexer) IndexDir(ctx context.Context, dir string) (*schema.Index, er
 	files := 0
 	bytes := 0
 	packages := map[string]packageInfo{}
+	typesByPackage := map[string][]schema.Section{}
 	functionsByPackage := map[string][]schema.Section{}
 	for _, path := range sources {
 		if strings.HasSuffix(path, "_test.go") {
@@ -178,10 +180,104 @@ func (i *goIndexer) IndexDir(ctx context.Context, dir string) (*schema.Index, er
 				functionsByPackage[pkgName] = funcs
 			}
 		}
+
+		// Type declarations
+		{
+			query, err := sitter.NewQuery([]byte(`
+				(source_file
+					(_)?
+					(comment)* @type_docs
+					.
+					(type_declaration
+						(type_spec
+							name: (type_identifier) @type_name
+							type: [
+								(struct_type) @type_struct
+								(interface_type) @type_interface
+								(function_type) @type_func
+
+								(generic_type) @type_other
+								(qualified_type) @type_other
+								(pointer_type) @type_other
+								(array_type) @type_other
+								(slice_type) @type_other
+								(map_type) @type_other
+								(channel_type) @type_other
+							]
+						)
+					)
+				)
+			`), golang.GetLanguage())
+			if err != nil {
+				return nil, errors.Wrap(err, "NewQuery")
+			}
+			defer query.Close()
+
+			cursor := sitter.NewQueryCursor()
+			defer cursor.Close()
+			cursor.Exec(query, n)
+
+			for {
+				match, ok := cursor.NextMatch()
+				if !ok {
+					break
+				}
+				captures := getCaptures(query, match)
+
+				typeDocs := commentsToMarkdown(content, captures["type_docs"])
+				typeName := firstCaptureContentOr(content, captures["type_name"], "")
+
+				typeStruct := firstCaptureContentOr(content, captures["type_struct"], "")
+				typeInterface := firstCaptureContentOr(content, captures["type_interface"], "")
+				typeFunc := firstCaptureContentOr(content, captures["type_func"], "")
+				typeOther := firstCaptureContentOr(content, captures["type_other"], "")
+
+				firstRune := []rune(typeName)[0]
+				if string(firstRune) != strings.ToUpper(string(firstRune)) {
+					continue // unexported
+				}
+
+				var typeLabel schema.Markdown
+				var typeDefinition string
+				if typeStruct != "" {
+					typeLabel = schema.Markdown(fmt.Sprintf("type %s struct", typeName))
+					typeDefinition = fmt.Sprintf("type %s %s", typeName, typeStruct)
+				} else if typeInterface != "" {
+					typeLabel = schema.Markdown(fmt.Sprintf("type %s interface", typeName))
+					typeDefinition = fmt.Sprintf("type %s %s", typeName, typeInterface)
+				} else if typeFunc != "" {
+					typeLabel = schema.Markdown(fmt.Sprintf("type %s func", typeName))
+					typeDefinition = fmt.Sprintf("type %s %s", typeName, typeFunc)
+				} else {
+					firstLine := strings.Split(typeOther, "\n")[0]
+					typeLabel = schema.Markdown(fmt.Sprintf("type %s %s", typeName, firstLine))
+					typeDefinition = fmt.Sprintf("type %s %s", typeName, typeOther)
+				}
+
+				types := typesByPackage[pkgName]
+				types = append(types, schema.Section{
+					ID:         typeName,
+					ShortLabel: typeName,
+					Label:      typeLabel,
+					Detail:     schema.Markdown(fmt.Sprintf("```go\n%s\n```\n\n%s", typeDefinition, typeDocs)),
+					SearchKey:  []string{pkgName, ".", typeName},
+				})
+				typesByPackage[pkgName] = types
+			}
+		}
 	}
 
 	var pages []schema.Page
 	for pkgName, pkgInfo := range packages {
+		typesSection := schema.Section{
+			ID:         "type",
+			ShortLabel: "type",
+			Label:      "Types",
+			Category:   true,
+			SearchKey:  []string{},
+			Children:   typesByPackage[pkgName],
+		}
+
 		functionsSection := schema.Section{
 			ID:         "func",
 			ShortLabel: "func",
@@ -196,7 +292,10 @@ func (i *goIndexer) IndexDir(ctx context.Context, dir string) (*schema.Index, er
 			Title:     "Package " + pkgName,
 			Detail:    schema.Markdown(pkgInfo.docs),
 			SearchKey: []string{pkgName},
-			Sections:  []schema.Section{functionsSection},
+			Sections: []schema.Section{
+				typesSection,
+				functionsSection,
+			},
 		})
 	}
 

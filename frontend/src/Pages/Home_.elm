@@ -243,7 +243,7 @@ supportedLanguages : List SupportedLanguage
 supportedLanguages =
     [ { name = "Go"
       , functions = "✅"
-      , types = "❌"
+      , types = "✅"
       , methods = "❌"
       , constsVars = "❌"
       , search = "✅"

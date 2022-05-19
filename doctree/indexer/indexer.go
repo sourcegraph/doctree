@@ -171,12 +171,12 @@ func List(indexDataDir string) ([]string, error) {
 	return indexes, nil
 }
 
-// Get gets all the language indexes for the specified project.
+// GetIndex gets all the language indexes for the specified project.
 //
 // When autoCloneMissing is true, if the project does not exist the server will attempt to
 // `git clone <projectName> and index it. Beware, this may not be safe to enable if you have Git
 // configured to access private repositories and the server is public!
-func Get(ctx context.Context, dataDir, indexDataDir, projectName string, autoCloneMissing bool) (apischema.ProjectIndexes, error) {
+func GetIndex(ctx context.Context, dataDir, indexDataDir, projectName string, autoCloneMissing bool) (apischema.ProjectIndexes, error) {
 	indexName := encodeProjectName(projectName)
 	if strings.Contains(indexName, "/") || strings.Contains(indexName, "..") {
 		return nil, errors.New("potentially malicious index name (this is likely a bug)")
@@ -192,7 +192,7 @@ func Get(ctx context.Context, dataDir, indexDataDir, projectName string, autoClo
 				log.Println("failed to clone", repositoryURL, "error:", err)
 				return nil, errors.Wrap(err, "cloneAndIndex")
 			}
-			return Get(ctx, dataDir, indexDataDir, projectName, false)
+			return GetIndex(ctx, dataDir, indexDataDir, projectName, false)
 		}
 	}
 	if err != nil {

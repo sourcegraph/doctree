@@ -118,7 +118,7 @@ func Serve(cloudMode bool, addr, dataDir, indexDataDir string) {
 			return
 		}
 	}))
-	mux.Handle("/api/get", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mux.Handle("/api/get-index", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// SECURITY: This endpoint isn't mutable and doesn't serve privileged information, and
 		// therefor safe to use from any origin.
 		w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -126,7 +126,7 @@ func Serve(cloudMode bool, addr, dataDir, indexDataDir string) {
 
 		projectName := r.URL.Query().Get("name")
 
-		projectIndexes, err := indexer.Get(r.Context(), dataDir, indexDataDir, projectName, cloudMode)
+		projectIndexes, err := indexer.GetIndex(r.Context(), dataDir, indexDataDir, projectName, cloudMode)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return

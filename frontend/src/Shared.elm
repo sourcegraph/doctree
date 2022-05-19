@@ -71,7 +71,7 @@ update _ msg model =
                 -- No project loaded yet, request it.
                 ( { model | currentProjectName = Just projectName }
                 , Http.get
-                    { url = Url.Builder.absolute [ "api", "get" ] [ Url.Builder.string "name" projectName ]
+                    { url = Url.Builder.absolute [ "api", "get-index" ] [ Url.Builder.string "name" projectName ]
                     , expect = Http.expectJson GotProject APISchema.projectIndexesDecoder
                     }
                 )

@@ -6,7 +6,7 @@ import "github.com/sourcegraph/doctree/doctree/schema"
 // ProjectList is the type returned by /api/list
 type ProjectList []string
 
-// ProjectIndexes is the type returned by /api/get?name=github.com/sourcegraph/sourcegraph
+// ProjectIndexes is the type returned by /api/get-index?name=github.com/sourcegraph/sourcegraph
 type ProjectIndexes map[string]schema.Index
 
 // SearchResults is the type returned by /api/search?query=foobar

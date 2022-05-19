@@ -16,6 +16,7 @@ import (
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
+	"github.com/sourcegraph/doctree/doctree/apischema"
 	"github.com/sourcegraph/doctree/doctree/schema"
 )
 
@@ -175,13 +176,13 @@ func List(indexDataDir string) ([]string, error) {
 // When autoCloneMissing is true, if the project does not exist the server will attempt to
 // `git clone <projectName> and index it. Beware, this may not be safe to enable if you have Git
 // configured to access private repositories and the server is public!
-func Get(ctx context.Context, dataDir, indexDataDir, projectName string, autoCloneMissing bool) (map[string]schema.Index, error) {
+func Get(ctx context.Context, dataDir, indexDataDir, projectName string, autoCloneMissing bool) (apischema.ProjectIndexes, error) {
 	indexName := encodeProjectName(projectName)
 	if strings.Contains(indexName, "/") || strings.Contains(indexName, "..") {
 		return nil, errors.New("potentially malicious index name (this is likely a bug)")
 	}
 
-	indexes := map[string]schema.Index{}
+	indexes := apischema.ProjectIndexes{}
 	dir, err := ioutil.ReadDir(filepath.Join(indexDataDir, indexName))
 	if os.IsNotExist(err) {
 		if autoCloneMissing {

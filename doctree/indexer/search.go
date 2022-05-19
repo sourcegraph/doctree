@@ -15,6 +15,7 @@ import (
 
 	"github.com/agnivade/levenshtein"
 	"github.com/pkg/errors"
+	"github.com/sourcegraph/doctree/doctree/apischema"
 	"github.com/sourcegraph/doctree/doctree/schema"
 	sinter "github.com/sourcegraph/doctree/libs/sinter/bindings/sinter-go"
 	"github.com/spaolacci/murmur3"
@@ -122,7 +123,7 @@ func IndexForSearch(projectName, indexDataDir string, indexes map[string]*schema
 	return nil
 }
 
-func Search(ctx context.Context, indexDataDir, query, projectName string) ([]Result, error) {
+func Search(ctx context.Context, indexDataDir, query, projectName string) ([]apischema.SearchResult, error) {
 	query, language := parseQuery(query)
 
 	// TODO: could skip sinter filter indexes from projects without our desired language.
@@ -130,7 +131,7 @@ func Search(ctx context.Context, indexDataDir, query, projectName string) ([]Res
 	if projectName == "" {
 		dir, err := ioutil.ReadDir(indexDataDir)
 		if os.IsNotExist(err) {
-			return []Result{}, nil
+			return []apischema.SearchResult{}, nil
 		}
 		if err != nil {
 			return nil, errors.Wrap(err, "ReadDir")
@@ -163,7 +164,7 @@ func Search(ctx context.Context, indexDataDir, query, projectName string) ([]Res
 	// TODO: support filtering to specific project
 	const rankedResultLimit = 10000
 	const limit = 100
-	out := []Result{}
+	out := []apischema.SearchResult{}
 	for _, sinterFile := range indexes {
 		sinterFilter, err := sinter.FilterReadFile(sinterFile)
 		if err != nil {
@@ -237,15 +238,6 @@ func parseQuery(query string) (realQuery string, language *schema.Language) {
 	return query, nil
 }
 
-type Result struct {
-	Language    string  `json:"language"`
-	ProjectName string  `json:"projectName"`
-	SearchKey   string  `json:"searchKey"`
-	Path        string  `json:"path"`
-	ID          string  `json:"id"`
-	Score       float64 `json:"score"`
-}
-
 type sinterResult struct {
 	Language    string     `json:"language"`
 	ProjectName string     `json:"projectName"`
@@ -254,8 +246,8 @@ type sinterResult struct {
 	Path        string     `json:"path"`
 }
 
-func decodeResults(results sinter.FilterResults, queryKey []string, language *schema.Language, limit int) []Result {
-	var out []Result
+func decodeResults(results sinter.FilterResults, queryKey []string, language *schema.Language, limit int) []apischema.SearchResult {
+	var out []apischema.SearchResult
 decoding:
 	for i := 0; i < results.Len(); i++ {
 		var result sinterResult
@@ -271,7 +263,7 @@ decoding:
 			absoluteKey := append([]string{result.Language, result.ProjectName}, searchKey...)
 			score := match(queryKey, absoluteKey)
 			if score > 0.5 {
-				out = append(out, Result{
+				out = append(out, apischema.SearchResult{
 					Language:    result.Language,
 					ProjectName: result.ProjectName,
 					SearchKey:   strings.Join(searchKey, ""),

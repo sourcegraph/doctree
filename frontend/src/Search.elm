@@ -9,7 +9,6 @@ import Html
 import Html.Attributes
 import Html.Events
 import Http
-import Json.Decode as D
 import Process
 import Task
 import Url.Builder
@@ -35,7 +34,7 @@ type alias Model =
     , debounceIntent : Int
     , query : String
     , projectName : Maybe String
-    , results : Maybe (Result Http.Error (List APISchema.SearchResult))
+    , results : Maybe (Result Http.Error APISchema.SearchResults)
     }
 
 
@@ -63,7 +62,7 @@ type Msg
     | OnDebounce
     | OnDebounceIntent
     | RunSearch Bool
-    | GotSearchResults (Result Http.Error (List APISchema.SearchResult))
+    | GotSearchResults (Result Http.Error APISchema.SearchResults)
     | NoOp
 
 
@@ -118,7 +117,7 @@ fetchSearchResults query intent projectName =
                 , Url.Builder.string "autocomplete" (boolToString (intent == False))
                 , Url.Builder.string "project" (Maybe.withDefault "" projectName)
                 ]
-        , expect = Http.expectJson GotSearchResults (D.list APISchema.searchResultDecoder)
+        , expect = Http.expectJson GotSearchResults APISchema.searchResultsDecoder
         }
 
 
@@ -153,7 +152,7 @@ searchInput =
         )
 
 
-searchResults : Maybe (Result Http.Error (List APISchema.SearchResult)) -> E.Element msg
+searchResults : Maybe (Result Http.Error APISchema.SearchResults) -> E.Element msg
 searchResults request =
     case request of
         Just response ->

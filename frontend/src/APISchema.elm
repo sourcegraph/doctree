@@ -36,6 +36,15 @@ projectIndexesDecoder =
 -- decoder for: /api/search?query=foobar
 
 
+type alias SearchResults =
+    List SearchResult
+
+
+searchResultsDecoder : Decoder SearchResults
+searchResultsDecoder =
+    Decode.list searchResultDecoder
+
+
 searchResultDecoder : Decoder SearchResult
 searchResultDecoder =
     Decode.succeed SearchResult

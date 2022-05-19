@@ -9,7 +9,9 @@ type ProjectList []string
 // ProjectIndexes is the type returned by /api/get?name=github.com/sourcegraph/sourcegraph
 type ProjectIndexes map[string]schema.Index
 
-// SearchResult is the type returned by /api/search?query=foobar
+// SearchResults is the type returned by /api/search?query=foobar
+type SearchResults []SearchResult
+
 type SearchResult struct {
 	Language    string  `json:"language"`
 	ProjectName string  `json:"projectName"`

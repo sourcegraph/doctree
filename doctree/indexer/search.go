@@ -123,7 +123,7 @@ func IndexForSearch(projectName, indexDataDir string, indexes map[string]*schema
 	return nil
 }
 
-func Search(ctx context.Context, indexDataDir, query, projectName string) ([]apischema.SearchResult, error) {
+func Search(ctx context.Context, indexDataDir, query, projectName string) (apischema.SearchResults, error) {
 	query, language := parseQuery(query)
 
 	// TODO: could skip sinter filter indexes from projects without our desired language.
@@ -131,7 +131,7 @@ func Search(ctx context.Context, indexDataDir, query, projectName string) ([]api
 	if projectName == "" {
 		dir, err := ioutil.ReadDir(indexDataDir)
 		if os.IsNotExist(err) {
-			return []apischema.SearchResult{}, nil
+			return apischema.SearchResults{}, nil
 		}
 		if err != nil {
 			return nil, errors.Wrap(err, "ReadDir")
@@ -164,7 +164,7 @@ func Search(ctx context.Context, indexDataDir, query, projectName string) ([]api
 	// TODO: support filtering to specific project
 	const rankedResultLimit = 10000
 	const limit = 100
-	out := []apischema.SearchResult{}
+	out := apischema.SearchResults{}
 	for _, sinterFile := range indexes {
 		sinterFilter, err := sinter.FilterReadFile(sinterFile)
 		if err != nil {
@@ -246,8 +246,8 @@ type sinterResult struct {
 	Path        string     `json:"path"`
 }
 
-func decodeResults(results sinter.FilterResults, queryKey []string, language *schema.Language, limit int) []apischema.SearchResult {
-	var out []apischema.SearchResult
+func decodeResults(results sinter.FilterResults, queryKey []string, language *schema.Language, limit int) apischema.SearchResults {
+	var out apischema.SearchResults
 decoding:
 	for i := 0; i < results.Len(); i++ {
 		var result sinterResult

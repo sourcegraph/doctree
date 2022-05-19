@@ -161,7 +161,7 @@ func (i *goIndexer) IndexDir(ctx context.Context, dir string) (*schema.Index, er
 				funcResult := firstCaptureContentOr(content, captures["func_result"], "")
 
 				firstRune := []rune(funcName)[0]
-				if string(firstRune) != strings.ToUpper(string(firstRune)) {
+				if string(firstRune) != strings.ToUpper(string(firstRune)) || string(firstRune) == "_" {
 					continue // unexported
 				}
 
@@ -233,7 +233,7 @@ func (i *goIndexer) IndexDir(ctx context.Context, dir string) (*schema.Index, er
 				typeOther := firstCaptureContentOr(content, captures["type_other"], "")
 
 				firstRune := []rune(typeName)[0]
-				if string(firstRune) != strings.ToUpper(string(firstRune)) {
+				if string(firstRune) != strings.ToUpper(string(firstRune)) || string(firstRune) == "_" {
 					continue // unexported
 				}
 

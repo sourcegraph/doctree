@@ -134,7 +134,7 @@ func (i *goIndexer) IndexDir(ctx context.Context, dir string) (*schema.Index, er
 						name: (identifier) @func_name
 						type_parameters: (type_parameter_list)? @func_type_params
 						parameters: (parameter_list)? @func_params
-						result: (qualified_type package: (package_identifier) name: (type_identifier))? @func_result
+						result: (_)? @func_result
 					)
 				)
 			`), golang.GetLanguage())

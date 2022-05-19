@@ -310,15 +310,31 @@ tasks:
   ops-add-sample-repos:
     desc: "Add sample repos to doctree.org (requires operations access)"
     cmds:
-      # Go
-      - task ops-add-repo -- https://github.com/golang/go
-      - task ops-add-repo -- https://github.com/gorilla/mux
-      # Python
-      - task ops-add-repo -- https://github.com/django/django
-      # Markdown
-      - task ops-add-repo -- https://github.com/Sobeston/ziglearn
-      # Zig
-      - task ops-add-repo-zigstd -- https://github.com/ziglang/zig
+      - task ops-add-repo -- github.com/Sobeston/ziglearn
+      - task ops-add-repo -- github.com/alanhamlett/pip-update-requirements
+      - task ops-add-repo -- github.com/caddyserver/caddy
+      - task ops-add-repo -- github.com/cozy/cozy-stack
+      - task ops-add-repo -- github.com/django/django
+      - task ops-add-repo -- github.com/elastic/elasticsearch
+      - task ops-add-repo -- github.com/facebook/react
+      - task ops-add-repo -- github.com/gogs/gogs
+      - task ops-add-repo -- github.com/golang/go
+      - task ops-add-repo -- github.com/gorilla/mux
+      - task ops-add-repo -- github.com/hexops/mach
+      - task ops-add-repo -- github.com/jertel/elastalert2
+      - task ops-add-repo -- github.com/kevinwojo/mvs
+      - task ops-add-repo -- github.com/kooparse/zalgebra
+      - task ops-add-repo -- github.com/kooparse/zgltf
+      - task ops-add-repo -- github.com/paulshen/css-editor
+      - task ops-add-repo -- github.com/pytest-dev/pytest
+      - task ops-add-repo -- github.com/rasahq/rasa
+      - task ops-add-repo -- github.com/renode/renode
+      - task ops-add-repo -- github.com/saltbo/zpan
+      - task ops-add-repo -- github.com/smallstep/certificates
+      - task ops-add-repo -- github.com/sourcegraph/sourcegraph
+      - task ops-add-repo -- github.com/wakatime/wakatime-cli
+      - task ops-add-repo -- github.com/zephyrproject-rtos/zephyr
+      - task ops-add-repo -- github.com/ziglang/zig
     env:
       HOST: root@164.92.76.86
 
@@ -327,7 +343,7 @@ tasks:
     cmds:
       - ssh $HOST -t 'docker pull sourcegraph/doctree:latest'
       - ssh $HOST -t 'docker rm -f doctree || true'
-      - ssh $HOST -t 'docker run -d --rm --name doctree -p 80:3333 --volume /.doctree:/home/nonroot/.doctree sourcegraph/doctree:latest serve -cloud'
+      - ssh $HOST -t 'docker run -d --restart=always --name doctree -p 80:3333 --volume /.doctree:/home/nonroot/.doctree sourcegraph/doctree:latest serve -cloud'
       - ssh $HOST -t 'docker ps'
     env:
       HOST: root@164.92.76.86

@@ -102,6 +102,11 @@ func markdownToPage(content []byte, path string) schema.Page {
 		pageTitle = path
 		// no search key for path, leave as empty list.
 	}
+	// TODO: Markdown headings often have Markdown/HTML images/links in them, we should strip those
+	// out for the page title.
+	if len(pageTitle) > 50 {
+		pageTitle = pageTitle[:50]
+	}
 	return schema.Page{
 		Path:      path,
 		Title:     pageTitle,

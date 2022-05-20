@@ -171,6 +171,14 @@ func List(indexDataDir string) ([]string, error) {
 	return indexes, nil
 }
 
+var (
+	jsonDecodeCacheMu sync.RWMutex
+	jsonDecodeCache   = map[string]struct {
+		modTime time.Time
+		value   schema.Index
+	}{}
+)
+
 // GetIndex gets all the language indexes for the specified project.
 //
 // When autoCloneMissing is true, if the project does not exist the server will attempt to
@@ -202,16 +210,39 @@ func GetIndex(ctx context.Context, dataDir, indexDataDir, projectName string, au
 		if !info.IsDir() && info.Name() != "search-index.sinter" && info.Name() != "version" {
 			lang := info.Name()
 
-			f, err := os.Open(filepath.Join(indexDataDir, indexName, lang))
+			indexFile := filepath.Join(indexDataDir, indexName, lang)
+			f, err := os.Open(indexFile)
 			if err != nil {
 				return nil, errors.Wrap(err, "Open")
 			}
 			defer f.Close()
 
+			stat, err := f.Stat()
+			if err != nil {
+				return nil, errors.Wrap(err, "Stat")
+			}
+
+			jsonDecodeCacheMu.RLock()
+			cached, ok := jsonDecodeCache[indexFile]
+			jsonDecodeCacheMu.RUnlock()
+			if ok && cached.modTime == stat.ModTime() {
+				indexes[lang] = cached.value
+				continue
+			}
+
 			var decoded schema.Index
 			if err := json.NewDecoder(f).Decode(&decoded); err != nil {
 				return nil, errors.Wrap(err, "Decode")
 			}
+			jsonDecodeCacheMu.Lock()
+			jsonDecodeCache[indexFile] = struct {
+				modTime time.Time
+				value   schema.Index
+			}{
+				modTime: stat.ModTime(),
+				value:   decoded,
+			}
+			jsonDecodeCacheMu.Unlock()
 
 			indexes[lang] = decoded
 		}

@@ -22,6 +22,7 @@ import (
 	"github.com/hexops/cmder"
 	"github.com/pkg/errors"
 	"github.com/sourcegraph/doctree/doctree/indexer"
+	"github.com/sourcegraph/doctree/doctree/schema"
 	"github.com/sourcegraph/doctree/frontend"
 )
 
@@ -109,6 +110,51 @@ func Serve(cloudMode bool, addr, dataDir, indexDataDir string) {
 			return
 		}
 		b, err := json.Marshal(indexes)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		_, err = w.Write(b)
+		if err != nil {
+			return
+		}
+	}))
+	mux.Handle("/api/get", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// SECURITY: This endpoint isn't mutable and doesn't serve privileged information, and
+		// therefor safe to use from any origin.
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Content-Type", "application/json")
+
+		projectName := r.URL.Query().Get("name")
+
+		projectIndexes, err := indexer.GetIndex(r.Context(), dataDir, indexDataDir, projectName, cloudMode)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		// Eliminate detailed information from the project indexes. This basically just leaves a list
+		// of all libraries and pages in the project, with metadata about them - but not the actual
+		// content of the pages themselves.
+		//
+		// Reduces the download size of e.g. golang/go from 4/37 MiB to just 10/81 KiB (compressed/uncompressed)
+		for lang, index := range projectIndexes {
+			for libIndex, lib := range index.Libraries {
+				for pageIndex, page := range lib.Pages {
+					page.Sections = []schema.Section{}
+					page.Detail = ""
+					for subPageIndex, subPage := range page.Subpages {
+						subPage.Sections = []schema.Section{}
+						subPage.Detail = ""
+						page.Subpages[subPageIndex] = subPage
+					}
+					lib.Pages[pageIndex] = page
+				}
+				index.Libraries[libIndex] = lib
+			}
+			projectIndexes[lang] = index
+		}
+		b, err := json.Marshal(projectIndexes)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return

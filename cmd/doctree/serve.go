@@ -21,6 +21,7 @@ import (
 	"github.com/fsnotify/fsnotify"
 	"github.com/hexops/cmder"
 	"github.com/pkg/errors"
+	"github.com/sourcegraph/doctree/doctree/apischema"
 	"github.com/sourcegraph/doctree/doctree/indexer"
 	"github.com/sourcegraph/doctree/doctree/schema"
 	"github.com/sourcegraph/doctree/frontend"
@@ -138,23 +139,31 @@ func Serve(cloudMode bool, addr, dataDir, indexDataDir string) {
 		// content of the pages themselves.
 		//
 		// Reduces the download size of e.g. golang/go from 4/37 MiB to just 10/81 KiB (compressed/uncompressed)
+		cpy := make(apischema.ProjectIndexes, len(projectIndexes))
 		for lang, index := range projectIndexes {
-			for libIndex, lib := range index.Libraries {
-				for pageIndex, page := range lib.Pages {
-					page.Sections = []schema.Section{}
-					page.Detail = ""
-					for subPageIndex, subPage := range page.Subpages {
-						subPage.Sections = []schema.Section{}
-						subPage.Detail = ""
-						page.Subpages[subPageIndex] = subPage
+			indexCpy := index
+			indexCpy.Libraries = make([]schema.Library, 0, len(index.Libraries))
+			for _, lib := range index.Libraries {
+				libCpy := lib
+				libCpy.Pages = make([]schema.Page, 0, len(lib.Pages))
+				for _, page := range lib.Pages {
+					pageCpy := page
+					pageCpy.Sections = []schema.Section{}
+					pageCpy.Detail = ""
+					pageCpy.Subpages = make([]schema.Page, 0, len(page.Subpages))
+					for _, subPage := range page.Subpages {
+						subPageCpy := subPage
+						subPageCpy.Sections = []schema.Section{}
+						subPageCpy.Detail = ""
+						pageCpy.Subpages = append(pageCpy.Subpages, subPageCpy)
 					}
-					lib.Pages[pageIndex] = page
+					libCpy.Pages = append(libCpy.Pages, pageCpy)
 				}
-				index.Libraries[libIndex] = lib
+				indexCpy.Libraries = append(indexCpy.Libraries, libCpy)
 			}
-			projectIndexes[lang] = index
+			cpy[lang] = indexCpy
 		}
-		b, err := json.Marshal(projectIndexes)
+		b, err := json.Marshal(cpy)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return

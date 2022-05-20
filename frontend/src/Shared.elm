@@ -70,10 +70,7 @@ update _ msg model =
             Maybe.withDefault
                 -- No project loaded yet, request it.
                 ( { model | currentProjectName = Just projectName }
-                , Http.get
-                    { url = Url.Builder.absolute [ "api", "get-index" ] [ Url.Builder.string "name" projectName ]
-                    , expect = Http.expectJson GotProject APISchema.projectIndexesDecoder
-                    }
+                , fetchProject projectName
                 )
                 -- Loaded already
                 (model.currentProjectName
@@ -84,6 +81,14 @@ update _ msg model =
 
         GotProject result ->
             ( { model | projectIndexes = Just result }, Cmd.none )
+
+
+fetchProject : String -> Cmd Msg
+fetchProject projectName =
+    Http.get
+        { url = Url.Builder.absolute [ "api", "get" ] [ Url.Builder.string "name" projectName ]
+        , expect = Http.expectJson GotProject APISchema.projectIndexesDecoder
+        }
 
 
 subscriptions : Request -> Model -> Sub Msg

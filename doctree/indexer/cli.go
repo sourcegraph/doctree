@@ -3,6 +3,7 @@ package indexer
 import (
 	"encoding/json"
 	"os"
+	"path/filepath"
 
 	"github.com/pkg/errors"
 )
@@ -27,6 +28,11 @@ func ReadAutoIndex(path string) (map[string]AutoIndexedProject, error) {
 	autoIndexedProjects := make(map[string]AutoIndexedProject)
 	data, err := os.ReadFile(path)
 	if err != nil {
+		if _, err := os.Stat(filepath.Dir(path)); os.IsNotExist(err) {
+			if err := os.Mkdir(filepath.Dir(path), os.ModePerm); err != nil {
+				return nil, errors.Wrap(err, "CreateAutoIndexDirectory")
+			}
+		}
 		if os.IsNotExist(err) {
 			_, err := os.Create(path)
 			if err != nil {

@@ -12,6 +12,7 @@ import Element.Region as Region
 import Gen.Params.NotFound exposing (Params)
 import Html exposing (Html)
 import Html.Attributes
+import Http
 import Markdown
 import Page
 import Process
@@ -87,8 +88,17 @@ parseProjectURI uri =
 -- INIT
 
 
+type alias PageID =
+    { project : String
+    , language : String
+    , page : String
+    }
+
+
 type alias Model =
     { search : Search.Model
+    , currentPageID : Maybe PageID
+    , page : Maybe (Result Http.Error APISchema.Page)
     }
 
 
@@ -100,12 +110,24 @@ init projectURI maybeID =
                 projectName =
                     projectURIName uri
 
+                maybePageID =
+                    projectURIPageID uri
+
                 ( searchModel, searchCmd ) =
                     Search.init (Just projectName)
             in
-            ( { search = searchModel }
+            ( { search = searchModel
+              , currentPageID = Nothing
+              , page = Nothing
+              }
             , Effect.batch
                 [ Effect.fromShared (Shared.GetProject projectName)
+                , case maybePageID of
+                    Just pageID ->
+                        Effect.fromCmd (fetchPage pageID)
+
+                    Nothing ->
+                        Effect.none
                 , case maybeID of
                     Just id ->
                         Effect.fromCmd (scrollIntoViewHack id)
@@ -121,7 +143,12 @@ init projectURI maybeID =
                 ( searchModel, searchCmd ) =
                     Search.init Nothing
             in
-            ( { search = searchModel }, Effect.fromCmd (Cmd.map (\v -> SearchMsg v) searchCmd) )
+            ( { search = searchModel
+              , currentPageID = Nothing
+              , page = Nothing
+              }
+            , Effect.fromCmd (Cmd.map (\v -> SearchMsg v) searchCmd)
+            )
 
 
 {-| HACK to workaround <https://elmlang.slack.com/archives/C192T0Q1E/p1652407639492269>
@@ -163,6 +190,22 @@ projectURIName projectURI =
             v
 
 
+projectURIPageID : ProjectURI -> Maybe PageID
+projectURIPageID projectURI =
+    case projectURI of
+        Name _ ->
+            Nothing
+
+        NameLanguage _ _ ->
+            Nothing
+
+        NameLanguagePage project language pagePath ->
+            Just { project = project, language = language, page = pagePath }
+
+        NameLanguagePageSection project language pagePath _ ->
+            Just { project = project, language = language, page = pagePath }
+
+
 
 -- UPDATE
 
@@ -170,6 +213,7 @@ projectURIName projectURI =
 type Msg
     = NoOp
     | SearchMsg Search.Msg
+    | GotPage (Result Http.Error APISchema.Page)
 
 
 update : Msg -> Model -> ( Model, Effect Msg )
@@ -186,6 +230,22 @@ update msg model =
             ( { model | search = searchModel }
             , Effect.fromCmd (Cmd.map (\v -> SearchMsg v) searchCmd)
             )
+
+        GotPage result ->
+            ( { model | page = Just result }, Effect.none )
+
+
+fetchPage : PageID -> Cmd Msg
+fetchPage pageID =
+    Http.get
+        { url =
+            Url.Builder.absolute [ "api", "get-page" ]
+                [ Url.Builder.string "project" pageID.project
+                , Url.Builder.string "language" pageID.language
+                , Url.Builder.string "page" pageID.page
+                ]
+        , expect = Http.expectJson GotPage APISchema.pageDecoder
+        }
 
 
 
@@ -350,48 +410,46 @@ viewNameLanguage model projectIndexes projectName language =
 
 viewNameLanguagePage : Model -> APISchema.ProjectIndexes -> String -> String -> String -> Html Msg
 viewNameLanguagePage model projectIndexes projectName language targetPagePath =
-    let
-        pageLookup =
-            Dict.get language projectIndexes
-                |> Maybe.andThen (\index -> List.head index.libraries)
-                |> Maybe.andThen (\library -> Just (List.filter (\docPage -> docPage.path == targetPagePath) library.pages))
-                |> Maybe.andThen (\pages -> List.head pages)
-    in
-    case pageLookup of
-        Just docPage ->
-            let
-                subpages =
-                    case docPage.subpages of
-                        Schema.Pages v ->
-                            v
-            in
-            E.layout (List.concat [ Style.layout, [ E.width E.fill ] ])
-                (E.column [ maxWidth, E.centerX ]
-                    [ E.column [ maxWidth ]
-                        [ E.wrappedRow [ E.paddingXY 0 32 ]
-                            [ E.link [] { url = "/", label = logo }
-                            , E.link [ Region.heading 1, Font.size 20 ] { url = Url.Builder.absolute [ projectName ] [], label = E.text (String.concat [ " / ", projectName ]) }
-                            , E.el [ Region.heading 1, Font.size 20 ] (E.text (String.concat [ " : ", String.toLower docPage.title ]))
-                            ]
-                        , Style.h1 [] (E.text docPage.title)
-                        , E.el [ E.paddingXY 0 16 ] (Markdown.render docPage.detail)
-                        , if List.length subpages > 0 then
-                            E.column []
-                                (List.concat
-                                    [ [ Style.h2 [] (E.text "Subpages") ]
-                                    , List.map (\subPage -> E.link [] { url = subPage.path, label = E.text subPage.title }) subpages
+    case model.page of
+        Just response ->
+            case response of
+                Ok docPage ->
+                    let
+                        subpages =
+                            case docPage.subpages of
+                                Schema.Pages v ->
+                                    v
+                    in
+                    E.layout (List.concat [ Style.layout, [ E.width E.fill ] ])
+                        (E.column [ maxWidth, E.centerX ]
+                            [ E.column [ maxWidth ]
+                                [ E.wrappedRow [ E.paddingXY 0 32 ]
+                                    [ E.link [] { url = "/", label = logo }
+                                    , E.link [ Region.heading 1, Font.size 20 ] { url = Url.Builder.absolute [ projectName ] [], label = E.text (String.concat [ " / ", projectName ]) }
+                                    , E.el [ Region.heading 1, Font.size 20 ] (E.text (String.concat [ " : ", String.toLower docPage.title ]))
                                     ]
-                                )
+                                , Style.h1 [] (E.text docPage.title)
+                                , E.el [ E.paddingXY 0 16 ] (Markdown.render docPage.detail)
+                                , if List.length subpages > 0 then
+                                    E.column []
+                                        (List.concat
+                                            [ [ Style.h2 [] (E.text "Subpages") ]
+                                            , List.map (\subPage -> E.link [] { url = subPage.path, label = E.text subPage.title }) subpages
+                                            ]
+                                        )
 
-                          else
-                            E.none
-                        ]
-                    , renderSections docPage.sections
-                    ]
-                )
+                                  else
+                                    E.none
+                                ]
+                            , renderSections docPage.sections
+                            ]
+                        )
+
+                Err err ->
+                    E.layout Style.layout (E.text (httpErrorToString err))
 
         Nothing ->
-            E.layout Style.layout (E.text "page not found")
+            E.layout Style.layout (E.text "loading..")
 
 
 maxWidth =

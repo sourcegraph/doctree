@@ -3,6 +3,7 @@ module Shared exposing
     , Model
     , Msg(..)
     , init
+    , maybeEquals
     , subscriptions
     , update
     )

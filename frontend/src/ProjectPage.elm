@@ -69,10 +69,29 @@ parseProjectURI : String -> Maybe ProjectURI
 parseProjectURI uri =
     case String.split "/-/" uri of
         name :: language :: docPage :: section :: _ ->
-            Just (NameLanguagePageSection name language docPage section)
+            Just
+                (NameLanguagePageSection name
+                    language
+                    (if docPage == "" then
+                        "/"
+
+                     else
+                        docPage
+                    )
+                    section
+                )
 
         name :: language :: docPage :: _ ->
-            Just (NameLanguagePage name language docPage)
+            Just
+                (NameLanguagePage name
+                    language
+                    (if docPage == "" then
+                        "/"
+
+                     else
+                        docPage
+                    )
+                )
 
         name :: language :: _ ->
             Just (NameLanguage name language)

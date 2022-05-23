@@ -50,6 +50,8 @@ func (i *goIndexer) IndexDir(ctx context.Context, dir string) (*schema.Index, er
 	files := 0
 	bytes := 0
 	packages := map[string]packageInfo{}
+	constsByPackage := map[string][]schema.Section{}
+	varsByPackage := map[string][]schema.Section{}
 	typesByPackage := map[string][]schema.Section{}
 	functionsByPackage := map[string][]schema.Section{}
 	for _, path := range sources {
@@ -119,7 +121,11 @@ func (i *goIndexer) IndexDir(ctx context.Context, dir string) (*schema.Index, er
 					}
 					packages[pkgName] = existing
 				} else {
-					packages[pkgName] = packageInfo{path: filepath.Dir(path), docs: pkgDocs}
+					dir := filepath.Dir(path)
+					if dir == "." {
+						dir = "/"
+					}
+					packages[pkgName] = packageInfo{path: dir, docs: pkgDocs}
 				}
 			}
 		}
@@ -265,26 +271,122 @@ func (i *goIndexer) IndexDir(ctx context.Context, dir string) (*schema.Index, er
 				typesByPackage[pkgName] = types
 			}
 		}
+
+		// Constants/variables
+		gatherConstsVars := func(constOrVar string, byPackage *map[string][]schema.Section) error {
+			query, err := sitter.NewQuery([]byte(fmt.Sprintf(`
+				(source_file
+					(_)?
+					(comment)* @group_docs
+					.
+					(%s_declaration
+						(_)?
+						(comment)* @docs
+						.
+						(%s_spec
+							name: (identifier) @name
+							type: (_)? @type
+							value: (_) @value
+						)
+					)
+				)
+			`, constOrVar, constOrVar)), golang.GetLanguage())
+			if err != nil {
+				return errors.Wrap(err, "NewQuery")
+			}
+			defer query.Close()
+
+			cursor := sitter.NewQueryCursor()
+			defer cursor.Close()
+			cursor.Exec(query, n)
+
+			for {
+				match, ok := cursor.NextMatch()
+				if !ok {
+					break
+				}
+				captures := getCaptures(query, match)
+
+				groupDocs := commentsToMarkdown(content, captures["group_docs"])
+				docs := commentsToMarkdown(content, captures["docs"])
+				name := firstCaptureContentOr(content, captures["name"], "")
+				typ := firstCaptureContentOr(content, captures["type"], "")
+				value := firstCaptureContentOr(content, captures["value"], "")
+
+				firstRune := []rune(name)[0]
+				if string(firstRune) != strings.ToUpper(string(firstRune)) || string(firstRune) == "_" {
+					continue // unexported
+				}
+
+				// TODO: right now group docs are discarded, we should emit them somehow.
+				_ = groupDocs
+				_ = typ
+
+				definition := fmt.Sprintf("%s %s = %s", constOrVar, name, value)
+
+				sections := (*byPackage)[pkgName]
+				sections = append(sections, schema.Section{
+					ID:         name,
+					ShortLabel: constOrVar + " " + name,
+					Label:      schema.Markdown(constOrVar + " " + name),
+					Detail:     schema.Markdown(fmt.Sprintf("```go\n%s\n```\n\n%s", definition, docs)),
+					SearchKey:  []string{pkgName, ".", name},
+				})
+				(*byPackage)[pkgName] = sections
+			}
+			return nil
+		}
+		if err := gatherConstsVars("const", &constsByPackage); err != nil {
+			return nil, err
+		}
+		if err := gatherConstsVars("var", &varsByPackage); err != nil {
+			return nil, err
+		}
 	}
 
 	var pages []schema.Page
 	for pkgName, pkgInfo := range packages {
-		typesSection := schema.Section{
-			ID:         "type",
-			ShortLabel: "type",
-			Label:      "Types",
-			Category:   true,
-			SearchKey:  []string{},
-			Children:   typesByPackage[pkgName],
-		}
+		topLevelSections := []schema.Section{}
 
-		functionsSection := schema.Section{
-			ID:         "func",
-			ShortLabel: "func",
-			Label:      "Functions",
-			Category:   true,
-			SearchKey:  []string{},
-			Children:   functionsByPackage[pkgName],
+		if len(constsByPackage[pkgName]) > 0 {
+			topLevelSections = append(topLevelSections, schema.Section{
+				ID:         "const",
+				ShortLabel: "const",
+				Label:      "Constants",
+				Category:   true,
+				SearchKey:  []string{},
+				Children:   constsByPackage[pkgName],
+			})
+		}
+		if len(varsByPackage[pkgName]) > 0 {
+			topLevelSections = append(topLevelSections, schema.Section{
+				ID:         "var",
+				ShortLabel: "var",
+				Label:      "Variables",
+				Category:   true,
+				SearchKey:  []string{},
+				Children:   varsByPackage[pkgName],
+			})
+		}
+		if len(typesByPackage[pkgName]) > 0 {
+			topLevelSections = append(topLevelSections, schema.Section{
+				ID:         "type",
+				ShortLabel: "type",
+				Label:      "Types",
+				Category:   true,
+				SearchKey:  []string{},
+				Children:   typesByPackage[pkgName],
+			})
+		}
+		if len(functionsByPackage[pkgName]) > 0 {
+			topLevelSections = append(topLevelSections, schema.Section{
+				ID:         "func",
+				ShortLabel: "func",
+				Label:      "Functions",
+				Category:   true,
+				SearchKey:  []string{},
+				Children:   functionsByPackage[pkgName],
+			})
 		}
 
 		pages = append(pages, schema.Page{
@@ -292,10 +394,7 @@ func (i *goIndexer) IndexDir(ctx context.Context, dir string) (*schema.Index, er
 			Title:     "Package " + pkgName,
 			Detail:    schema.Markdown(pkgInfo.docs),
 			SearchKey: []string{pkgName},
-			Sections: []schema.Section{
-				typesSection,
-				functionsSection,
-			},
+			Sections:  topLevelSections,
 		})
 	}
 

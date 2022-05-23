@@ -20,7 +20,20 @@ projectListDecoder =
 
 
 
+-- decoder for: /api/get-page?project=github.com/sourcegraph/sourcegraph&language=markdown&page=/README.md
+
+
+type alias Page =
+    Schema.Page
+
+
+pageDecoder =
+    Schema.pageDecoder
+
+
+
 -- decoder for: /api/get?name=github.com/sourcegraph/sourcegraph
+-- decoder for: /api/get-index?name=github.com/sourcegraph/sourcegraph
 
 
 type alias ProjectIndexes =

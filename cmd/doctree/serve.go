@@ -120,6 +120,62 @@ func Serve(cloudMode bool, addr, dataDir, indexDataDir string) {
 			return
 		}
 	}))
+	mux.Handle("/api/get-page", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// SECURITY: This endpoint isn't mutable and doesn't serve privileged information, and
+		// therefor safe to use from any origin.
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Content-Type", "application/json")
+
+		projectName := r.URL.Query().Get("project")
+		language := r.URL.Query().Get("language")
+		pagePath := r.URL.Query().Get("page")
+
+		projectIndexes, err := indexer.GetIndex(r.Context(), dataDir, indexDataDir, projectName, cloudMode)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		// Lookup the page in the index.
+		index, ok := projectIndexes[language]
+		if !ok {
+			http.Error(w, "no such language for this project", http.StatusNotFound)
+			return
+		}
+		// TODO: require library from client?
+		var found *schema.Page
+		for _, lib := range index.Libraries {
+			for _, page := range lib.Pages {
+				if page.Path == pagePath {
+					found = &page
+					break
+				}
+				for _, subPage := range page.Subpages {
+					if subPage.Path == pagePath {
+						found = &page
+						break
+					}
+				}
+				if found != nil {
+					break
+				}
+			}
+		}
+		if found == nil {
+			http.Error(w, "page not found", http.StatusNotFound)
+			return
+		}
+
+		b, err := json.Marshal(apischema.Page(*found))
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		_, err = w.Write(b)
+		if err != nil {
+			return
+		}
+	}))
 	mux.Handle("/api/get", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// SECURITY: This endpoint isn't mutable and doesn't serve privileged information, and
 		// therefor safe to use from any origin.

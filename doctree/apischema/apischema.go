@@ -3,6 +3,9 @@ package apischema
 
 import "github.com/sourcegraph/doctree/doctree/schema"
 
+// Page is the type returned by /api/get-page?project=github.com/sourcegraph/sourcegraph&language=markdown&page=/README.md
+type Page schema.Page
+
 // ProjectList is the type returned by /api/list
 type ProjectList []string
 

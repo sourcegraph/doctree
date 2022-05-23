@@ -144,9 +144,12 @@ To get started see [docs/development.md](docs/development.md) and the [language 
 
 ## Changelog
 
-### v0.1
+### v0.2 (not yet released)
 
-#### Added
+* Page downloads are now even slimmer (a few KiB for a a large Go package page.)
+* Fixed an issue where root Go project pages (e.g. `github.com/gorilla/mux` which contains only one Go package) would not render.
+
+### v0.1
 
 * Go, Python, Zig, and Markdown basic support
 * Basic search navigation experience based on [experimental Sinter search filters](https://github.com/hexops/sinter/blob/c87e502f3cfd468d3d1263b7caf7cea94ff6d084/src/filter.zig#L18-L85)

@@ -172,6 +172,8 @@ func List(indexDataDir string) ([]string, error) {
 }
 
 var (
+	// Cache of indexes read from disk, because reading+decoding can be slow (~500ms for e.g.
+	// the golang/go index)
 	jsonDecodeCacheMu sync.RWMutex
 	jsonDecodeCache   = map[string]struct {
 		modTime time.Time

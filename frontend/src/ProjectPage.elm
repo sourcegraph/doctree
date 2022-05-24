@@ -13,8 +13,10 @@ import Gen.Params.NotFound exposing (Params)
 import Html exposing (Html)
 import Html.Attributes
 import Http
+import InView
 import Markdown
 import Page
+import Ports
 import Process
 import Request
 import Schema
@@ -118,6 +120,8 @@ type alias Model =
     { search : Search.Model
     , currentPageID : Maybe PageID
     , page : Maybe (Result Http.Error APISchema.Page)
+    , inView : InView.State
+    , inViewSection : String
     }
 
 
@@ -134,13 +138,19 @@ init projectURI maybeID =
 
                 ( searchModel, searchCmd ) =
                     Search.init (Just projectName)
+
+                ( inViewModel, inViewCmds ) =
+                    InView.init InViewMsg []
             in
             ( { search = searchModel
               , currentPageID = Nothing
               , page = Nothing
+              , inView = inViewModel
+              , inViewSection = ""
               }
             , Effect.batch
                 [ Effect.fromShared (Shared.GetProject projectName)
+                , Effect.fromCmd inViewCmds
                 , case maybePageID of
                     Just pageID ->
                         Effect.fromCmd (fetchPage pageID)
@@ -161,12 +171,20 @@ init projectURI maybeID =
             let
                 ( searchModel, searchCmd ) =
                     Search.init Nothing
+
+                ( inViewModel, inViewCmds ) =
+                    InView.init InViewMsg []
             in
             ( { search = searchModel
               , currentPageID = Nothing
               , page = Nothing
+              , inView = inViewModel
+              , inViewSection = ""
               }
-            , Effect.fromCmd (Cmd.map (\v -> SearchMsg v) searchCmd)
+            , Effect.batch
+                [ Effect.fromCmd (Cmd.map (\v -> SearchMsg v) searchCmd)
+                , Effect.fromCmd inViewCmds
+                ]
             )
 
 
@@ -233,6 +251,28 @@ type Msg
     = NoOp
     | SearchMsg Search.Msg
     | GotPage (Result Http.Error APISchema.Page)
+    | OnScroll { x : Float, y : Float }
+    | InViewMsg InView.Msg
+
+
+sectionIDs : Schema.Sections -> List String
+sectionIDs sections =
+    let
+        list =
+            case sections of
+                Schema.Sections v ->
+                    v
+    in
+    List.concatMap
+        (\section ->
+            List.concat
+                [ [ section.id
+                  , String.concat [ section.id, "-content" ]
+                  ]
+                , sectionIDs section.children
+                ]
+        )
+        list
 
 
 update : Msg -> Model -> ( Model, Effect Msg )
@@ -251,7 +291,80 @@ update msg model =
             )
 
         GotPage result ->
-            ( { model | page = Just result }, Effect.none )
+            case result of
+                Ok docPage ->
+                    let
+                        ( inView, inViewCmds ) =
+                            InView.addElements InViewMsg (sectionIDs docPage.sections) model.inView
+                    in
+                    ( { model | page = Just result, inView = inView }, Effect.fromCmd inViewCmds )
+
+                Err _ ->
+                    ( { model | page = Just result }, Effect.none )
+
+        OnScroll offset ->
+            ( { model
+                | inView = InView.updateViewportOffset offset model.inView
+                , inViewSection = Maybe.withDefault "" (determineInViewSection model)
+              }
+            , Effect.none
+            )
+
+        InViewMsg inViewMsg ->
+            let
+                ( inView, inViewCmds ) =
+                    InView.update InViewMsg inViewMsg model.inView
+            in
+            ( { model
+                | inView = inView
+                , inViewSection = Maybe.withDefault "" (determineInViewSection model)
+              }
+            , Effect.fromCmd inViewCmds
+            )
+
+
+determineInViewSection : Model -> Maybe String
+determineInViewSection model =
+    model.page
+        |> Maybe.andThen
+            (\response ->
+                case response of
+                    Ok docPage ->
+                        let
+                            inViewSections =
+                                List.map
+                                    (\sectionID ->
+                                        let
+                                            margin =
+                                                { top = 100, right = 0, bottom = 100, left = 0 }
+
+                                            contentDist =
+                                                Maybe.withDefault 1000000 (isInViewDistance (String.concat [ sectionID, "-content" ]) margin model.inView)
+
+                                            dist =
+                                                Maybe.withDefault contentDist (isInViewDistance sectionID margin model.inView)
+                                        in
+                                        { sectionID = sectionID, dist = dist }
+                                    )
+                                    (sectionIDs docPage.sections)
+
+                            inViewSection =
+                                List.head (List.sortBy .dist inViewSections)
+                        in
+                        inViewSection |> Maybe.andThen (\section -> Just (trimSuffix section.sectionID "-content"))
+
+                    Err _ ->
+                        Nothing
+            )
+
+
+trimSuffix : String -> String -> String
+trimSuffix str suffix =
+    if String.endsWith suffix str then
+        String.dropRight (String.length suffix) str
+
+    else
+        str
 
 
 fetchPage : PageID -> Cmd Msg
@@ -273,7 +386,10 @@ fetchPage pageID =
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-    Sub.none
+    Sub.batch
+        [ InView.subscriptions InViewMsg model.inView
+        , Ports.onScroll OnScroll
+        ]
 
 
 
@@ -460,7 +576,7 @@ viewNameLanguagePage model projectIndexes projectName language targetPagePath =
                                   else
                                     E.none
                                 ]
-                            , renderSections docPage.sections
+                            , renderSections model docPage.sections
                             ]
                         )
 
@@ -475,8 +591,8 @@ maxWidth =
     E.width (E.fill |> E.maximum 1000)
 
 
-renderSections : Schema.Sections -> E.Element Msg
-renderSections sections =
+renderSections : Model -> Schema.Sections -> E.Element Msg
+renderSections model sections =
     let
         list =
             case sections of
@@ -484,11 +600,29 @@ renderSections sections =
                     v
     in
     E.column [ maxWidth, E.paddingXY 0 16 ]
-        (List.map (\section -> renderSection section) list)
+        (List.map (\section -> renderSection model section) list)
 
 
-renderSection : Schema.Section -> E.Element Msg
-renderSection section =
+isInViewDistance : String -> InView.Margin -> InView.State -> Maybe Float
+isInViewDistance id margin state =
+    let
+        calc { viewport } element =
+            if
+                (viewport.y + margin.top < element.y + element.height)
+                    && (viewport.y + viewport.height - margin.bottom > element.y)
+                    && (viewport.x + margin.left < element.x + element.width)
+                    && (viewport.x + viewport.width - margin.right > element.x)
+            then
+                Basics.abs ((viewport.y + (viewport.height / 2)) - (element.y + (element.height / 2)))
+
+            else
+                1000000
+    in
+    InView.custom (\a b -> Maybe.map (calc a) b) id state
+
+
+renderSection : Model -> Schema.Section -> E.Element Msg
+renderSection model section =
     E.column [ E.width E.fill ]
         [ E.column [ E.width E.fill ]
             [ if section.category then
@@ -497,7 +631,18 @@ renderSection section =
 
               else
                 Style.h3 [ E.paddingXY 0 8, E.htmlAttribute (Html.Attributes.id section.id) ]
-                    (E.text (String.concat [ "# ", section.label ]))
+                    (E.text
+                        (String.concat
+                            [ "# "
+                            , section.label
+                            , if section.id == model.inViewSection then
+                                " *"
+
+                              else
+                                ""
+                            ]
+                        )
+                    )
             , if section.detail == "" then
                 E.none
 
@@ -507,10 +652,11 @@ renderSection section =
                     , Border.color (E.rgb255 210 210 210)
                     , Border.widthEach { top = 0, left = 6, bottom = 0, right = 0 }
                     , E.paddingXY 16 16
+                    , E.htmlAttribute (Html.Attributes.id (String.concat [ section.id, "-content" ]))
                     ]
                     (Markdown.render section.detail)
             ]
-        , E.el [ E.width E.fill ] (renderSections section.children)
+        , E.el [ E.width E.fill ] (renderSections model section.children)
         ]
 
 

@@ -97,7 +97,16 @@ func Serve(cloudMode bool, addr, dataDir, indexDataDir string) {
 		}
 
 		w.Header().Set("Content-Type", "application/javascript")
-		fmt.Fprintf(w, `Elm.Main.init({flags: %s})`, flagsJson)
+		fmt.Fprintf(w, `
+var app = Elm.Main.init({flags: %s});
+
+// Port used by https://github.com/rl-king/elm-inview/tree/2.0.0
+window.addEventListener("scroll", function() {
+    var offset = {x: window.pageXOffset, y: window.pageYOffset};
+    app.ports.onScroll.send(offset);
+}, { passive: true });
+
+`, flagsJson)
 	}))
 	mux.Handle("/api/list", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// SECURITY: This endpoint isn't mutable and doesn't serve privileged information, and

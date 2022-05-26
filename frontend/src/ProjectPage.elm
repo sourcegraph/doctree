@@ -2,9 +2,11 @@ module ProjectPage exposing (Model, Msg, init, page, subscriptions, update, view
 
 import APISchema
 import Browser.Dom
+import Browser.Navigation
 import Dict exposing (keys)
 import Effect exposing (Effect)
 import Element as E
+import Element.Background as Background
 import Element.Border as Border
 import Element.Font as Font
 import Element.Lazy
@@ -13,7 +15,7 @@ import Gen.Params.NotFound exposing (Params)
 import Html exposing (Html)
 import Html.Attributes
 import Http
-import InView
+import Json.Decode
 import Markdown
 import Page
 import Ports
@@ -43,7 +45,7 @@ page shared req =
     in
     Page.advanced
         { init = init projectURI urlParams.id
-        , update = update
+        , update = update projectURI req
         , view = view shared projectURI
         , subscriptions = subscriptions
         }
@@ -120,7 +122,6 @@ type alias Model =
     { search : Search.Model
     , currentPageID : Maybe PageID
     , page : Maybe (Result Http.Error APISchema.Page)
-    , inView : InView.State
     , inViewSection : String
     }
 
@@ -138,19 +139,14 @@ init projectURI maybeID =
 
                 ( searchModel, searchCmd ) =
                     Search.init (Just projectName)
-
-                ( inViewModel, inViewCmds ) =
-                    InView.init InViewMsg []
             in
             ( { search = searchModel
               , currentPageID = Nothing
               , page = Nothing
-              , inView = inViewModel
               , inViewSection = ""
               }
             , Effect.batch
                 [ Effect.fromShared (Shared.GetProject projectName)
-                , Effect.fromCmd inViewCmds
                 , case maybePageID of
                     Just pageID ->
                         Effect.fromCmd (fetchPage pageID)
@@ -171,20 +167,13 @@ init projectURI maybeID =
             let
                 ( searchModel, searchCmd ) =
                     Search.init Nothing
-
-                ( inViewModel, inViewCmds ) =
-                    InView.init InViewMsg []
             in
             ( { search = searchModel
               , currentPageID = Nothing
               , page = Nothing
-              , inView = inViewModel
               , inViewSection = ""
               }
-            , Effect.batch
-                [ Effect.fromCmd (Cmd.map (\v -> SearchMsg v) searchCmd)
-                , Effect.fromCmd inViewCmds
-                ]
+            , Effect.fromCmd (Cmd.map (\v -> SearchMsg v) searchCmd)
             )
 
 
@@ -251,8 +240,8 @@ type Msg
     = NoOp
     | SearchMsg Search.Msg
     | GotPage (Result Http.Error APISchema.Page)
-    | OnScroll { x : Float, y : Float }
-    | InViewMsg InView.Msg
+    | ObservePage
+    | OnObserved (Result Json.Decode.Error (List Ports.ObserveEvent))
 
 
 sectionIDs : Schema.Sections -> List String
@@ -266,17 +255,20 @@ sectionIDs sections =
     List.concatMap
         (\section ->
             List.concat
-                [ [ section.id
-                  , String.concat [ section.id, "-content" ]
-                  ]
+                [ [ section.id ]
+                , if section.detail /= "" then
+                    [ String.concat [ section.id, "-content" ] ]
+
+                  else
+                    []
                 , sectionIDs section.children
                 ]
         )
         list
 
 
-update : Msg -> Model -> ( Model, Effect Msg )
-update msg model =
+update : Maybe ProjectURI -> Request.With Params -> Msg -> Model -> ( Model, Effect Msg )
+update projectURI req msg model =
     case msg of
         NoOp ->
             ( model, Effect.none )
@@ -291,71 +283,101 @@ update msg model =
             )
 
         GotPage result ->
+            ( { model | page = Just result }
+              -- HACK: having a task here send ObservePage ensures that the view function has ran,
+              -- but it's not sufficient to ensure the elements are actually in the DOM yet and so
+              -- when update with ObservePage runs, they might not be there. So we use a small delay
+            , Effect.fromCmd (Process.sleep 500 |> Task.perform (\_ -> ObservePage))
+            )
+
+        ObservePage ->
+            case model.page of
+                Just response ->
+                    case response of
+                        Ok docPage ->
+                            let
+                                observeCmds =
+                                    List.map
+                                        (\id -> Ports.observeElementID id)
+                                        (sectionIDs docPage.sections)
+                            in
+                            ( model, Effect.fromCmd (Cmd.batch observeCmds) )
+
+                        Err _ ->
+                            ( model, Effect.none )
+
+                Nothing ->
+                    ( model, Effect.none )
+
+        OnObserved result ->
             case result of
-                Ok docPage ->
+                Ok events ->
                     let
-                        ( inView, inViewCmds ) =
-                            InView.addElements InViewMsg (sectionIDs docPage.sections) model.inView
+                        newInViewSections =
+                            Dict.fromList
+                                (List.filterMap
+                                    (\v ->
+                                        if v.isIntersecting then
+                                            Just ( v.targetID, v )
+
+                                        else
+                                            Nothing
+                                    )
+                                    events
+                                )
+
+                        byDistanceToCenter =
+                            List.sortBy .distanceToCenter
+                                (List.map
+                                    (\( _, v ) -> v)
+                                    (Dict.toList newInViewSections)
+                                )
+
+                        inViewSection =
+                            Maybe.withDefault model.inViewSection
+                                (List.head byDistanceToCenter
+                                    |> Maybe.andThen (\v -> Just (trimSuffix v.targetID "-content"))
+                                )
                     in
-                    ( { model | page = Just result, inView = inView }, Effect.fromCmd inViewCmds )
+                    ( { model
+                        | inViewSection = inViewSection
+                      }
+                    , let
+                        nlp =
+                            projectURI
+                                |> Maybe.andThen
+                                    (\uri ->
+                                        case uri of
+                                            Name _ ->
+                                                Nothing
+
+                                            NameLanguage _ _ ->
+                                                Nothing
+
+                                            NameLanguagePage projectName language path ->
+                                                Just ( projectName, language, path )
+
+                                            NameLanguagePageSection projectName language path _ ->
+                                                Just ( projectName, language, path )
+                                    )
+                      in
+                      case nlp of
+                        Just ( projectName, language, path ) ->
+                            Effect.fromCmd
+                                (Browser.Navigation.replaceUrl
+                                    req.key
+                                    (Url.Builder.absolute
+                                        [ projectName, "-", language, "-", path ]
+                                        [ Url.Builder.string "id" inViewSection ]
+                                    )
+                                )
+
+                        Nothing ->
+                            Effect.none
+                    )
 
                 Err _ ->
-                    ( { model | page = Just result }, Effect.none )
-
-        OnScroll offset ->
-            ( { model
-                | inView = InView.updateViewportOffset offset model.inView
-                , inViewSection = Maybe.withDefault "" (determineInViewSection model)
-              }
-            , Effect.none
-            )
-
-        InViewMsg inViewMsg ->
-            let
-                ( inView, inViewCmds ) =
-                    InView.update InViewMsg inViewMsg model.inView
-            in
-            ( { model
-                | inView = inView
-                , inViewSection = Maybe.withDefault "" (determineInViewSection model)
-              }
-            , Effect.fromCmd inViewCmds
-            )
-
-
-determineInViewSection : Model -> Maybe String
-determineInViewSection model =
-    model.page
-        |> Maybe.andThen
-            (\response ->
-                case response of
-                    Ok docPage ->
-                        let
-                            inViewSections =
-                                List.map
-                                    (\sectionID ->
-                                        let
-                                            margin =
-                                                { top = 100, right = 0, bottom = 100, left = 0 }
-
-                                            contentDist =
-                                                Maybe.withDefault 1000000 (isInViewDistance (String.concat [ sectionID, "-content" ]) margin model.inView)
-
-                                            dist =
-                                                Maybe.withDefault contentDist (isInViewDistance sectionID margin model.inView)
-                                        in
-                                        { sectionID = sectionID, dist = dist }
-                                    )
-                                    (sectionIDs docPage.sections)
-
-                            inViewSection =
-                                List.head (List.sortBy .dist inViewSections)
-                        in
-                        inViewSection |> Maybe.andThen (\section -> Just (trimSuffix section.sectionID "-content"))
-
-                    Err _ ->
-                        Nothing
-            )
+                    ( model, Effect.none )
 
 
 trimSuffix : String -> String -> String
@@ -385,11 +407,8 @@ fetchPage pageID =
 
 
 subscriptions : Model -> Sub Msg
-subscriptions model =
-    Sub.batch
-        [ InView.subscriptions InViewMsg model.inView
-        , Ports.onScroll OnScroll
-        ]
+subscriptions _ =
+    Ports.onObserved (\events -> OnObserved (Json.Decode.decodeValue Ports.observeEventsDecoder events))
 
 
 
@@ -555,28 +574,55 @@ viewNameLanguagePage model projectIndexes projectName language targetPagePath =
                                 Schema.Pages v ->
                                     v
                     in
-                    E.layout (List.concat [ Style.layout, [ E.width E.fill ] ])
-                        (E.column [ maxWidth, E.centerX ]
-                            [ E.column [ maxWidth ]
-                                [ E.wrappedRow [ E.paddingXY 0 32 ]
-                                    [ E.link [] { url = "/", label = logo }
-                                    , E.link [ Region.heading 1, Font.size 20 ] { url = Url.Builder.absolute [ projectName ] [], label = E.text (String.concat [ " / ", projectName ]) }
-                                    , E.el [ Region.heading 1, Font.size 20 ] (E.text (String.concat [ " : ", String.toLower docPage.title ]))
-                                    ]
-                                , Style.h1 [] (E.text docPage.title)
-                                , E.el [ E.paddingXY 0 16 ] (Markdown.render docPage.detail)
-                                , if List.length subpages > 0 then
-                                    E.column []
-                                        (List.concat
-                                            [ [ Style.h2 [] (E.text "Subpages") ]
-                                            , List.map (\subPage -> E.link [] { url = subPage.path, label = E.text subPage.title }) subpages
-                                            ]
-                                        )
-
-                                  else
-                                    E.none
+                    E.layout (List.concat [ Style.layout, [ E.width E.fill, E.height E.fill ] ])
+                        (E.row
+                            [ E.width E.fill
+                            , E.height E.fill
+                            ]
+                            [ E.el
+                                [ -- TODO: Follow the advice at https://package.elm-lang.org/packages/mdgriffith/elm-ui/latest/Element#responsiveness
+                                  -- and remove this width hack
+                                  E.width (E.px 1)
+                                , E.htmlAttribute (Html.Attributes.style "width" "calc(25%)")
+                                , E.height E.fill
+                                , Background.color (E.rgb 0.95 0.95 0.95)
                                 ]
-                            , renderSections model docPage.sections
+                                (Element.Lazy.lazy
+                                    (\( v1, v2 ) -> sidebar v1 v2)
+                                    ( model.inViewSection, docPage )
+                                )
+                            , E.row
+                                [ E.width E.fill
+                                , E.height E.fill
+                                , E.centerX
+                                , E.scrollbarY
+                                , E.paddingEach { top = 0, right = 0, bottom = 0, left = 48 }
+                                ]
+                                [ E.column
+                                    [ E.width (E.fill |> E.maximum 1000)
+                                    , E.height E.fill
+                                    ]
+                                    [ E.wrappedRow [ E.paddingXY 0 32 ]
+                                        [ E.link [ Region.heading 1, Font.size 20 ] { url = Url.Builder.absolute [ projectName ] [], label = E.text projectName }
+                                        , E.el [ Region.heading 1, Font.size 20 ] (E.text (String.concat [ " : ", String.toLower docPage.title ]))
+                                        ]
+                                    , Style.h1 [] (E.text docPage.title)
+                                    , E.el [ E.paddingXY 0 16 ] (Markdown.render docPage.detail)
+                                    , if List.length subpages > 0 then
+                                        E.column []
+                                            (List.concat
+                                                [ [ Style.h2 [] (E.text "Subpages") ]
+                                                , List.map (\subPage -> E.link [] { url = subPage.path, label = E.text subPage.title }) subpages
+                                                ]
+                                            )
+
+                                      else
+                                        E.none
+                                    , Element.Lazy.lazy
+                                        (\v1 -> renderSections v1)
+                                        docPage.sections
+                                    ]
+                                ]
                             ]
                         )
 
@@ -587,42 +633,20 @@ viewNameLanguagePage model projectIndexes projectName language targetPagePath =
             E.layout Style.layout (E.text "loading..")
 
 
-maxWidth =
-    E.width (E.fill |> E.maximum 1000)
-
-
-renderSections : Model -> Schema.Sections -> E.Element Msg
-renderSections model sections =
+renderSections : Schema.Sections -> E.Element Msg
+renderSections sections =
     let
         list =
             case sections of
                 Schema.Sections v ->
                     v
     in
-    E.column [ maxWidth, E.paddingXY 0 16 ]
-        (List.map (\section -> renderSection model section) list)
+    E.column [ E.paddingXY 0 16 ]
+        (List.map (\section -> renderSection section) list)
 
 
-isInViewDistance : String -> InView.Margin -> InView.State -> Maybe Float
-isInViewDistance id margin state =
-    let
-        calc { viewport } element =
-            if
-                (viewport.y + margin.top < element.y + element.height)
-                    && (viewport.y + viewport.height - margin.bottom > element.y)
-                    && (viewport.x + margin.left < element.x + element.width)
-                    && (viewport.x + viewport.width - margin.right > element.x)
-            then
-                Basics.abs ((viewport.y + (viewport.height / 2)) - (element.y + (element.height / 2)))
-
-            else
-                1000000
-    in
-    InView.custom (\a b -> Maybe.map (calc a) b) id state
-
-
-renderSection : Model -> Schema.Section -> E.Element Msg
-renderSection model section =
+renderSection : Schema.Section -> E.Element Msg
+renderSection section =
     E.column [ E.width E.fill ]
         [ E.column [ E.width E.fill ]
             [ if section.category then
@@ -632,16 +656,7 @@ renderSection model section =
               else
                 Style.h3 [ E.paddingXY 0 8, E.htmlAttribute (Html.Attributes.id section.id) ]
                     (E.text
-                        (String.concat
-                            [ "# "
-                            , section.label
-                            , if section.id == model.inViewSection then
-                                " *"
-
-                              else
-                                ""
-                            ]
-                        )
+                        (String.concat [ "# ", section.label ])
                     )
             , if section.detail == "" then
                 E.none
@@ -656,7 +671,7 @@ renderSection model section =
                     ]
                     (Markdown.render section.detail)
             ]
-        , E.el [ E.width E.fill ] (renderSections model section.children)
+        , E.el [ E.width E.fill ] (renderSections section.children)
         ]
 
 
@@ -669,3 +684,63 @@ logo =
             { src = "/mascot.svg", description = "cute computer / doctree mascot" }
         , E.el [ Font.size 32, Font.bold ] (E.text "doctree")
         ]
+
+
+sidebar : String -> APISchema.Page -> E.Element msg
+sidebar inViewSection docPage =
+    E.column
+        [ E.alignRight
+        , E.width (E.px 350)
+        , E.height E.fill
+        , E.scrollbarY
+        ]
+        [ E.link [ E.centerX, E.paddingXY 0 16 ] { url = "/", label = logo }
+        , E.el
+            [ E.height E.fill
+            , E.width E.fill
+            , E.paddingEach { top = 0, right = 64, bottom = 128, left = 16 }
+            ]
+            (sidebarSections inViewSection 0 docPage.sections)
+        ]
+
+
+sidebarSections : String -> Int -> Schema.Sections -> E.Element msg
+sidebarSections inViewSection depth sections =
+    let
+        list =
+            case sections of
+                Schema.Sections v ->
+                    v
+    in
+    E.column []
+        (List.map
+            (\section ->
+                E.column [ E.paddingEach { top = 0, right = 0, bottom = 0, left = 32 * depth } ]
+                    [ if section.category then
+                        Style.h4 [ E.paddingXY 0 16 ] (E.text section.label)
+
+                      else
+                        E.link
+                            [ Font.underline
+                            , E.paddingXY 0 8
+                            , if section.id == inViewSection then
+                                Font.bold
+
+                              else
+                                Font.medium
+                            ]
+                            { url = "#"
+                            , label =
+                                E.text
+                                    (if section.id == inViewSection then
+                                        String.concat [ "* ", section.shortLabel ]
+
+                                     else
+                                        section.shortLabel
+                                    )
+                            }
+                    , sidebarSections inViewSection (depth + 1) section.children
+                    ]
+            )
+            list
+        )

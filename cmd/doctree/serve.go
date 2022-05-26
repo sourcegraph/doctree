@@ -98,14 +98,42 @@ func Serve(cloudMode bool, addr, dataDir, indexDataDir string) {
 
 		w.Header().Set("Content-Type", "application/javascript")
 		fmt.Fprintf(w, `
-var app = Elm.Main.init({flags: %s});
+let app = Elm.Main.init({flags: %s});
 
-// Port used by https://github.com/rl-king/elm-inview/tree/2.0.0
-window.addEventListener("scroll", function() {
-    var offset = {x: window.pageXOffset, y: window.pageYOffset};
-    app.ports.onScroll.send(offset);
-}, { passive: true });
+let onObserved = (entries, observer) => {
+	if (app.ports.onObserved) {
+		app.ports.onObserved.send(entries.map(entry => {
+			let rootCenter = entry.rootBounds.y + (entry.rootBounds.height/2.0);
+			let entryCenter = entry.intersectionRect.y + (entry.intersectionRect.height/2.0);
+			let distanceToCenter = Math.abs(rootCenter - entryCenter);
+			// NOTE: distanceToCenter only updates, i.e. events are only sent, when threshold
+			// changes. So if the element is completely in view, distanceToCenter will not update.
+			return ({
+				isIntersecting: entry.isIntersecting,
+				intersectionRatio: entry.intersectionRatio,
+				distanceToCenter: distanceToCenter,
+				targetID: entry.target.id
+			});
+		}));
+	}
+};
 
+let observer = new IntersectionObserver(onObserved, {
+	threshold: 0, // 1px
+	// intersect when an element crosses the horizontal line at center of screen.
+	rootMargin: '-50%% 0%% -50%% 0%%',
+});
+
+app.ports.observeElementID.subscribe(function(id) {
+	requestAnimationFrame(() => {
+		let target = document.getElementById(id);
+		if (!target) {
+			console.error("warning: observeElementID given invalid ID: " + id);
+			return;
+		}
+		observer.observe(target);
+	});
+});
 `, flagsJson)
 	}))
 	mux.Handle("/api/list", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

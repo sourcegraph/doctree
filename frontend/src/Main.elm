@@ -12,7 +12,6 @@ import Http
 import Project
 import Route exposing (Route(..), toRoute)
 import Search
-import Task
 import Url
 import Util
 
@@ -109,9 +108,33 @@ update msg model =
                     ( model, Nav.load href )
 
         UrlChanged url ->
-            ( { model | url = url }
-            , Cmd.none
-            )
+            let
+                route =
+                    toRoute (Url.toString url)
+            in
+            if route /= model.route then
+                -- Route changed
+                let
+                    projectPage =
+                        Maybe.map (\v -> Project.init v) (Project.fromRoute route)
+                in
+                ( { model
+                    | url = url
+                    , route = route
+                    , projectPage = Maybe.map (\( subModel, _ ) -> subModel) projectPage
+                  }
+                , case projectPage of
+                    Just ( _, subCmds ) ->
+                        Cmd.map (\m -> ProjectPage m) subCmds
+
+                    Nothing ->
+                        Cmd.none
+                )
+
+            else
+                ( { model | url = url }
+                , Cmd.none
+                )
 
         GotProjectList projectList ->
             ( { model | projectList = Just projectList }, Cmd.none )
@@ -142,7 +165,7 @@ update msg model =
             ( { model | projectIndexes = Just result }, Cmd.none )
 
         ProjectPage m ->
-            ( model, Task.succeed () |> Task.perform (\_ -> mapProjectMsg m) )
+            update (mapProjectMsg m) model
 
         ProjectPageUpdate subMsg ->
             case model.projectPage of
@@ -240,13 +263,11 @@ view model =
                     let
                         page =
                             Project.viewProjectLanguagePage model.search
-                                model.projectIndexes
                                 projectName
                                 language
                                 pagePath
                                 sectionID
                                 searchQuery
-                                model.flags.cloudMode
                                 subModel
                     in
                     { title = page.title

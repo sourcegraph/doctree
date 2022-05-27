@@ -39,3 +39,23 @@ fetchSearchResults msg query intent projectName =
                 ]
         , expect = Http.expectJson msg APISchema.searchResultsDecoder
         }
+
+
+type alias PageID =
+    { project : String
+    , language : String
+    , page : String
+    }
+
+
+fetchPage : (Result Http.Error APISchema.Page -> msg) -> PageID -> Cmd msg
+fetchPage msg pageID =
+    Http.get
+        { url =
+            Url.Builder.absolute [ "api", "get-page" ]
+                [ Url.Builder.string "project" pageID.project
+                , Url.Builder.string "language" pageID.language
+                , Url.Builder.string "page" pageID.page
+                ]
+        , expect = Http.expectJson msg APISchema.pageDecoder
+        }

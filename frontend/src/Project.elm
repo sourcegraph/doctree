@@ -13,6 +13,7 @@ import Element.Font as Font
 import Element.Input exposing (search)
 import Element.Lazy
 import Element.Region as Region
+import Html exposing (section)
 import Html.Attributes
 import Http
 import Json.Decode
@@ -140,6 +141,7 @@ type UpdateMsg
     | UpdateObservePage
     | UpdateOnObserved (Result Json.Decode.Error (List Ports.ObserveEvent))
     | UpdateScrollIntoViewLater String
+    | NavigateToSectionID (Maybe SectionID)
 
 
 update : Browser.Navigation.Key -> UpdateMsg -> Model -> ( Model, Cmd Msg )
@@ -244,6 +246,14 @@ update key msg model =
                                 ScrollIntoViewLater id
                     )
             )
+
+        NavigateToSectionID sectionID ->
+            case sectionID of
+                Just id ->
+                    ( model, attemptScrollIntoView id )
+
+                Nothing ->
+                    ( model, Cmd.none )
 
 
 subscriptions : Model -> Sub Msg

@@ -102,7 +102,25 @@ update msg model =
         LinkClicked urlRequest ->
             case urlRequest of
                 Browser.Internal url ->
-                    ( model, Nav.pushUrl model.key (Url.toString url) )
+                    let
+                        route =
+                            toRoute (Url.toString url)
+                    in
+                    case route of
+                        Route.ProjectLanguagePage _ _ _ newSectionID _ ->
+                            if equalExceptSectionID model.route route then
+                                -- Only the section ID changed.
+                                update
+                                    (ProjectPageUpdate
+                                        (Project.NavigateToSectionID newSectionID)
+                                    )
+                                    { model | url = url, route = route }
+
+                            else
+                                ( model, Nav.pushUrl model.key (Url.toString url) )
+
+                        _ ->
+                            ( model, Nav.pushUrl model.key (Url.toString url) )
 
                 Browser.External href ->
                     ( model, Nav.load href )
@@ -317,3 +335,30 @@ mapProjectMsg msg =
 
         Project.ScrollIntoViewLater id ->
             ProjectPageUpdate (Project.UpdateScrollIntoViewLater id)
+
+
+{-| Whether or not the two ProjectLanguagePage routes are equal
+except for the sectionID query parameter
+-}
+equalExceptSectionID : Route -> Route -> Bool
+equalExceptSectionID a b =
+    case a of
+        Route.ProjectLanguagePage projectName language pagePath sectionID searchQuery ->
+            case b of
+                Route.ProjectLanguagePage newProjectName newLanguage newPagePath newSectionID newSearchQuery ->
+                    projectName
+                        == newProjectName
+                        && language
+                        == newLanguage
+                        && pagePath
+                        == newPagePath
+                        && sectionID
+                        /= newSectionID
+                        && searchQuery
+                        == newSearchQuery
+
+                _ ->
+                    False
+
+        _ ->
+            False

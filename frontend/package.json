@@ -7,5 +7,8 @@
   "devDependencies": {
     "elm": "^0.19.1-5",
     "elm-spa": "^6.0.4"
+  },
+  "dependencies": {
+    "elm-live": "^4.0.2"
   }
 }

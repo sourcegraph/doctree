@@ -22,7 +22,7 @@ tasks:
     cmds:
       - .bin/doctree serve
     env:
-      ELM_DEBUG_SERVER: "http://localhost:1234/"
+      ELM_DEBUG_SERVER: "http://localhost:8000/"
     deps:
       - build-go-debug
 
@@ -31,7 +31,7 @@ tasks:
     cmds:
       - .bin/doctree serve -cloud
     env:
-      ELM_DEBUG_SERVER: "http://localhost:1234/"
+      ELM_DEBUG_SERVER: "http://localhost:8000/"
     deps:
       - build-go-debug
 

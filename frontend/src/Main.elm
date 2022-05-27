@@ -2,6 +2,7 @@ module Main exposing (Model, Msg(..), init, main, subscriptions, update, view)
 
 import Browser
 import Browser.Navigation as Nav
+import Flags exposing (Flags)
 import Home
 import Html exposing (..)
 import Html.Attributes exposing (..)
@@ -12,7 +13,7 @@ import Search
 import Url
 
 
-main : Program () Model Msg
+main : Program Flags Model Msg
 main =
     Browser.application
         { init = init
@@ -25,7 +26,8 @@ main =
 
 
 type alias Model =
-    { key : Nav.Key
+    { flags : Flags.Decoded
+    , key : Nav.Key
     , url : Url.Url
     , route : Route
     , projectList : Maybe (Result Http.Error (List String))
@@ -33,8 +35,8 @@ type alias Model =
     }
 
 
-init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
-init _ url key =
+init : Flags -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
+init flags url key =
     let
         ( searchModel, searchCmd ) =
             Search.init Nothing
@@ -42,7 +44,8 @@ init _ url key =
         route =
             toRoute (Url.toString url)
     in
-    ( { key = key
+    ( { flags = Flags.decode flags
+      , key = key
       , url = url
       , route = route
       , projectList = Nothing
@@ -118,7 +121,10 @@ view model =
         Route.Home _ ->
             let
                 page =
-                    Home.view True { projectList = model.projectList, search = model.search }
+                    Home.view model.flags.cloudMode
+                        { projectList = model.projectList
+                        , search = model.search
+                        }
             in
             { title = page.title
             , body =

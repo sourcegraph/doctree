@@ -102,25 +102,7 @@ update msg model =
         LinkClicked urlRequest ->
             case urlRequest of
                 Browser.Internal url ->
-                    let
-                        route =
-                            toRoute (Url.toString url)
-                    in
-                    case route of
-                        Route.ProjectLanguagePage _ _ _ newSectionID _ ->
-                            if equalExceptSectionID model.route route then
-                                -- Only the section ID changed.
-                                update
-                                    (ProjectPageUpdate
-                                        (Project.NavigateToSectionID newSectionID)
-                                    )
-                                    { model | url = url, route = route }
-
-                            else
-                                ( model, Nav.pushUrl model.key (Url.toString url) )
-
-                        _ ->
-                            ( model, Nav.pushUrl model.key (Url.toString url) )
+                    ( model, Nav.pushUrl model.key (Url.toString url) )
 
                 Browser.External href ->
                     ( model, Nav.load href )
@@ -130,8 +112,8 @@ update msg model =
                 route =
                     toRoute (Url.toString url)
             in
-            if route /= model.route then
-                -- Route changed
+            if url.path /= model.url.path then
+                -- Page changed
                 let
                     projectPage =
                         Maybe.map (\v -> Project.init v) (Project.fromRoute route)
@@ -158,9 +140,25 @@ update msg model =
                 )
 
             else
-                ( { model | url = url }
-                , Cmd.none
-                )
+                case route of
+                    Route.ProjectLanguagePage _ _ _ newSectionID _ ->
+                        if equalExceptSectionID model.route route then
+                            -- Only the section ID changed.
+                            update
+                                (ProjectPageUpdate
+                                    (Project.NavigateToSectionID newSectionID)
+                                )
+                                { model | url = url, route = route }
+
+                        else
+                            ( { model | url = url, route = route }
+                            , Cmd.none
+                            )
+
+                    _ ->
+                        ( { model | url = url, route = route }
+                        , Cmd.none
+                        )
 
         GotProjectList projectList ->
             ( { model | projectList = Just projectList }, Cmd.none )

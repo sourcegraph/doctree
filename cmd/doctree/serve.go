@@ -367,7 +367,7 @@ app.ports.observeElementID.subscribe(function(id) {
 
 func frontendHandler(cloudMode bool) http.Handler {
 	if debugServer := os.Getenv("ELM_DEBUG_SERVER"); debugServer != "" {
-		// Reverse proxy to the elm-spa debug server for hot code reloading, etc.
+		// Reverse proxy to the elm-live debug server for hot code reloading, etc.
 		remote, err := url.Parse(debugServer)
 		if err != nil {
 			panic(err)

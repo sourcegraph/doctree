@@ -39,7 +39,7 @@ tasks:
     desc: Run Elm frontend dev server
     dir: frontend
     cmds:
-      - npx elm-spa server | grep -v 'Ready at'
+      - npx elm-live src/Main.elm
 
   build:
     desc: Build Go + Elm code in release mode
@@ -52,26 +52,22 @@ tasks:
     desc: Build Elm frontend code (debug mode)
     dir: frontend
     cmds:
-      - npx elm-spa gen
       - mkdir -p public/dist/
-      - npx elm make --debug .elm-spa/defaults/Main.elm --output ./public/dist/elm.js
+      - npx elm make --debug src/Main.elm --output ./public/dist/elm.js
     sources:
       - ./frontend/src/**/*.elm
     generates:
-      - .elm-spa/**/*
       - ./frontend/public/dist/elm.js
 
   build-elm-release:
     desc: Build Elm frontend code (release mode, minified, etc.)
     dir: frontend
     cmds:
-      - npx elm-spa gen
       - mkdir -p public/dist/
-      - npx elm make .elm-spa/defaults/Main.elm --optimize --output ./public/dist/elm.js
+      - npx elm make src/Main.elm --optimize --output ./public/dist/elm.js
     sources:
       - ./frontend/src/**/*.elm
     generates:
-      - .elm-spa/**/*
       - ./frontend/public/dist/elm.js
 
   build-go-debug:

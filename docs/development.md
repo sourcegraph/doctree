@@ -12,7 +12,7 @@
 brew install go-task/tap/go-task
 ```
 
-Then ensure [Elm](https://elm-lang.org/), [elm-spa](https://elm-spa.dev), frontend dependencies and Zig libraries are cloned using:
+Then ensure [Elm](https://elm-lang.org/), frontend dependencies and Zig libraries are cloned using:
 
 ```sh
 task setup

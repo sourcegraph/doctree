@@ -280,6 +280,97 @@ viewProject search projectIndexesRequest projectName searchQuery cloudMode model
     }
 
 
+viewProjectLanguage :
+    Search.Model
+    -> Maybe (Result Http.Error APISchema.ProjectIndexes)
+    -> ProjectName
+    -> Language
+    -> Maybe SearchQuery
+    -> Bool
+    -> Model
+    -> Browser.Document Msg
+viewProjectLanguage search projectIndexesRequest projectName language searchQuery cloudMode model =
+    { title = "doctree"
+    , body =
+        [ case projectIndexesRequest of
+            Just response ->
+                case response of
+                    Ok projectIndexes ->
+                        let
+                            firstLanguage =
+                                Maybe.withDefault "" (List.head (keys projectIndexes))
+
+                            selectedLanguage =
+                                if language == "" then
+                                    firstLanguage
+
+                                else
+                                    language
+
+                            indexLookup =
+                                Dict.get selectedLanguage projectIndexes
+                        in
+                        case indexLookup of
+                            Just index ->
+                                let
+                                    listHead =
+                                        List.head index.libraries
+                                in
+                                case listHead of
+                                    Just library ->
+                                        E.layout (List.concat [ Style.layout, [ E.width E.fill ] ])
+                                            (E.column [ E.centerX, E.paddingXY 0 32 ]
+                                                [ E.row []
+                                                    [ E.link [] { url = "/", label = logo }
+                                                    , E.el [ Region.heading 1, Font.size 24 ] (E.text (String.concat [ " / ", projectName ]))
+                                                    ]
+                                                , E.row [ E.width E.fill, E.paddingXY 0 64 ]
+                                                    -- TODO: Should UI sort pages, or indexers themselves decide order? Probably the latter?
+                                                    [ E.column [ E.width (E.fillPortion 1) ]
+                                                        (List.map
+                                                            (\docPage ->
+                                                                E.link [ E.width (E.fillPortion 1) ]
+                                                                    { url =
+                                                                        Url.Builder.absolute [ projectName, "-", selectedLanguage, "-", docPage.path ] []
+                                                                    , label = E.el [ Font.underline ] (E.text docPage.path)
+                                                                    }
+                                                            )
+                                                            (List.sortBy .path library.pages)
+                                                        )
+                                                    , E.column [ E.width (E.fillPortion 1) ]
+                                                        (List.map
+                                                            (\docPage ->
+                                                                E.link [ E.width (E.fillPortion 1) ]
+                                                                    { url =
+                                                                        Url.Builder.absolute [ projectName, "-", selectedLanguage, "-", docPage.path ] []
+                                                                    , label = E.el [ Font.underline ] (E.text docPage.title)
+                                                                    }
+                                                            )
+                                                            (List.sortBy .path library.pages)
+                                                        )
+                                                    ]
+                                                ]
+                                            )
+
+                                    Nothing ->
+                                        E.layout Style.layout (E.text "error: invalid index: must have at least on library")
+
+                            Nothing ->
+                                E.layout Style.layout (E.text "language not found")
+
+                    Err err ->
+                        E.layout Style.layout (E.text (httpErrorToString err))
+
+            Nothing ->
+                if cloudMode then
+                    E.layout Style.layout (E.text "loading.. (repository may be cloning/indexing which can take up to 120s)")
+
+                else
+                    E.layout Style.layout (E.text "loading..")
+        ]
+    }
+
+
 sectionIDs : Schema.Sections -> List String
 sectionIDs sections =
     let

@@ -371,6 +371,105 @@ viewProjectLanguage search projectIndexesRequest projectName language searchQuer
     }
 
 
+viewProjectLanguagePage :
+    Search.Model
+    -> Maybe (Result Http.Error APISchema.ProjectIndexes)
+    -> ProjectName
+    -> Language
+    -> PagePath
+    -> Maybe SectionID
+    -> Maybe SearchQuery
+    -> Bool
+    -> Model
+    -> Browser.Document Msg
+viewProjectLanguagePage search projectIndexesRequest projectName language pagePath searchQuery sectionID cloudMode model =
+    { title = "doctree"
+    , body =
+        [ case projectIndexesRequest of
+            Just projectIndexesResponse ->
+                case projectIndexesResponse of
+                    Ok projectIndexes ->
+                        case model.page of
+                            Just response ->
+                                case response of
+                                    Ok docPage ->
+                                        let
+                                            subpages =
+                                                case docPage.subpages of
+                                                    Schema.Pages v ->
+                                                        v
+                                        in
+                                        E.layout (List.concat [ Style.layout, [ E.width E.fill, E.height E.fill ] ])
+                                            (E.row
+                                                [ E.width E.fill
+                                                , E.height E.fill
+                                                ]
+                                                [ E.el
+                                                    [ -- TODO: Follow the advice at https://package.elm-lang.org/packages/mdgriffith/elm-ui/latest/Element#responsiveness
+                                                      -- and remove this width hack
+                                                      E.width (E.px 1)
+                                                    , E.htmlAttribute (Html.Attributes.style "width" "calc(25%)")
+                                                    , E.height E.fill
+                                                    , Background.color (E.rgb 0.95 0.95 0.95)
+                                                    ]
+                                                    (Element.Lazy.lazy
+                                                        (\( v1, v2 ) -> sidebar v1 v2)
+                                                        ( model.inViewSection, docPage )
+                                                    )
+                                                , E.row
+                                                    [ E.width E.fill
+                                                    , E.height E.fill
+                                                    , E.centerX
+                                                    , E.scrollbarY
+                                                    , E.paddingEach { top = 0, right = 0, bottom = 0, left = 48 }
+                                                    ]
+                                                    [ E.column
+                                                        [ E.width (E.fill |> E.maximum 1000)
+                                                        , E.height E.fill
+                                                        ]
+                                                        [ E.wrappedRow [ E.paddingXY 0 32 ]
+                                                            [ E.link [ Region.heading 1, Font.size 20 ] { url = Url.Builder.absolute [ projectName ] [], label = E.text projectName }
+                                                            , E.el [ Region.heading 1, Font.size 20 ] (E.text (String.concat [ " : ", String.toLower docPage.title ]))
+                                                            ]
+                                                        , Style.h1 [] (E.text docPage.title)
+                                                        , E.el [ E.paddingXY 0 16 ] (Markdown.render docPage.detail)
+                                                        , if List.length subpages > 0 then
+                                                            E.column []
+                                                                (List.concat
+                                                                    [ [ Style.h2 [] (E.text "Subpages") ]
+                                                                    , List.map (\subPage -> E.link [] { url = subPage.path, label = E.text subPage.title }) subpages
+                                                                    ]
+                                                                )
+
+                                                          else
+                                                            E.none
+                                                        , Element.Lazy.lazy
+                                                            (\v1 -> renderSections v1)
+                                                            docPage.sections
+                                                        ]
+                                                    ]
+                                                ]
+                                            )
+
+                                    Err err ->
+                                        E.layout Style.layout (E.text (httpErrorToString err))
+
+                            Nothing ->
+                                E.layout Style.layout (E.text "loading..")
+
+                    Err err ->
+                        E.layout Style.layout (E.text (httpErrorToString err))
+
+            Nothing ->
+                if cloudMode then
+                    E.layout Style.layout (E.text "loading.. (repository may be cloning/indexing which can take up to 120s)")
+
+                else
+                    E.layout Style.layout (E.text "loading..")
+        ]
+    }
+
+
 sectionIDs : Schema.Sections -> List String
 sectionIDs sections =
     let

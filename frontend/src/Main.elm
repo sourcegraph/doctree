@@ -234,12 +234,34 @@ view model =
                         [ text "error: view Route.Project when model empty!" ]
                     }
 
-        _ ->
+        Route.ProjectLanguagePage projectName language pagePath sectionID searchQuery ->
+            case model.projectPage of
+                Just subModel ->
+                    let
+                        page =
+                            Project.viewProjectLanguagePage model.search
+                                model.projectIndexes
+                                projectName
+                                language
+                                pagePath
+                                sectionID
+                                searchQuery
+                                model.flags.cloudMode
+                                subModel
+                    in
+                    { title = page.title
+                    , body = List.map (\v -> Html.map mapProjectMsg v) page.body
+                    }
+
+                Nothing ->
+                    { title = "doctree"
+                    , body =
+                        [ text "error: view Route.Project when model empty!" ]
+                    }
+
+        Route.NotFound ->
             { title = "doctree"
-            , body =
-                [ text "TODO: "
-                , b [] [ text (Route.toString model.route) ]
-                ]
+            , body = [ text "not found" ]
             }
 
 

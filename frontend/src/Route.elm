@@ -2,7 +2,7 @@ module Route exposing
     ( Language
     , PagePath
     , ProjectName
-    , Route
+    , Route(..)
     , SearchQuery
     , SectionID
     , toRoute

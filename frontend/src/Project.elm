@@ -3,6 +3,7 @@ module Project exposing (..)
 import API
 import APISchema
 import Browser
+import Browser.Dom
 import Browser.Navigation
 import Dict exposing (keys)
 import Element as E
@@ -71,7 +72,7 @@ init route =
             )
 
         -- TODO: use searchQuery parameter
-        ProjectLanguagePage projectName language pagePath _ _ ->
+        ProjectLanguagePage projectName language pagePath sectionID _ ->
             let
                 pageID =
                     { projectName = projectName
@@ -82,15 +83,40 @@ init route =
             ( { pageID = Just pageID, page = Nothing, inViewSection = "" }
             , Cmd.batch
                 [ API.fetchPage GotPage pageID
+                , case sectionID of
+                    Just id ->
+                        attemptScrollIntoView id
 
-                -- TODO: if sectionID present, scroll into view.
-                -- , case sectionID of
-                --     Just id ->
-                --         Effect.fromCmd (scrollIntoView id)
-                --     Nothing ->
-                --         Effect.none
+                    Nothing ->
+                        Cmd.none
                 ]
             )
+
+
+attemptScrollIntoView : String -> Cmd Msg
+attemptScrollIntoView id =
+    scrollIntoView id
+        |> Task.attempt
+            (\result ->
+                case result of
+                    Ok _ ->
+                        NoOp
+
+                    Err _ ->
+                        ScrollIntoViewLater id
+            )
+
+
+scrollIntoView : String -> Task.Task Browser.Dom.Error ()
+scrollIntoView id =
+    Browser.Dom.getViewportOf "content-area"
+        |> Task.andThen
+            (\contentArea ->
+                Task.map
+                    (\info -> contentArea.viewport.y + info.element.y)
+                    (Browser.Dom.getElement id)
+            )
+        |> Task.andThen (\y -> Browser.Dom.setViewportOf "content-area" 0 y)
 
 
 
@@ -104,6 +130,7 @@ type Msg
     | GotPage (Result Http.Error APISchema.Page)
     | ObservePage
     | OnObserved (Result Json.Decode.Error (List Ports.ObserveEvent))
+    | ScrollIntoViewLater String
 
 
 type UpdateMsg
@@ -111,6 +138,7 @@ type UpdateMsg
     | UpdateGotPage (Result Http.Error APISchema.Page)
     | UpdateObservePage
     | UpdateOnObserved (Result Json.Decode.Error (List Ports.ObserveEvent))
+    | UpdateScrollIntoViewLater String
 
 
 update : Browser.Navigation.Key -> UpdateMsg -> Model -> ( Model, Cmd Msg )
@@ -200,6 +228,21 @@ update key msg model =
 
                 Err _ ->
                     ( model, Cmd.none )
+
+        UpdateScrollIntoViewLater id ->
+            ( model
+            , Process.sleep 16
+                |> Task.andThen (\_ -> scrollIntoView id)
+                |> Task.attempt
+                    (\result ->
+                        case result of
+                            Ok _ ->
+                                NoOp
+
+                            Err _ ->
+                                ScrollIntoViewLater id
+                    )
+            )
 
 
 subscriptions : Model -> Sub Msg
@@ -413,6 +456,7 @@ viewProjectLanguagePage _ projectName _ _ _ _ model =
                                     , E.height E.fill
                                     , E.centerX
                                     , E.scrollbarY
+                                    , E.htmlAttribute (Html.Attributes.id "content-area")
                                     , E.paddingEach { top = 0, right = 0, bottom = 0, left = 48 }
                                     ]
                                     [ E.column

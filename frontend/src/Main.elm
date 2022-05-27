@@ -306,3 +306,6 @@ mapProjectMsg msg =
 
         Project.OnObserved result ->
             ProjectPageUpdate (Project.UpdateOnObserved result)
+
+        Project.ScrollIntoViewLater id ->
+            ProjectPageUpdate (Project.UpdateScrollIntoViewLater id)

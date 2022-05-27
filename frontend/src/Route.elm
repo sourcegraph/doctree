@@ -93,6 +93,21 @@ routeParser =
         [ map Home (top <?> Query.string "q")
         , map Project (projectNameParser <?> Query.string "q")
         , map ProjectLanguage (projectNameParser </> s "-" </> string <?> Query.string "q")
+        , map
+            (\projectName language sectionID searchQuery ->
+                ProjectLanguagePage projectName
+                    language
+                    "/"
+                    sectionID
+                    searchQuery
+            )
+            (projectNameParser
+                </> s "-"
+                </> string
+                </> s "-"
+                <?> Query.string "id"
+                <?> Query.string "q"
+            )
         , map ProjectLanguagePage
             (projectNameParser
                 </> s "-"

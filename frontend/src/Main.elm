@@ -1,5 +1,6 @@
 module Main exposing (Model, Msg(..), init, main, subscriptions, update, view)
 
+import API
 import Browser
 import Browser.Navigation as Nav
 import Flags exposing (Flags)
@@ -7,7 +8,6 @@ import Home
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Http
-import Json.Decode
 import Route exposing (Route, toRoute)
 import Search
 import Url
@@ -54,7 +54,7 @@ init flags url key =
     , Cmd.batch
         [ case route of
             Route.Home _ ->
-                fetchProjectList
+                API.fetchProjectList GotProjectList
 
             _ ->
                 Cmd.none
@@ -97,16 +97,6 @@ update msg model =
             ( { model | search = searchModel }
             , Cmd.map (\v -> SearchMsg v) searchCmd
             )
-
-
-{-| TODO: move to Util package
--}
-fetchProjectList : Cmd Msg
-fetchProjectList =
-    Http.get
-        { url = "/api/list"
-        , expect = Http.expectJson GotProjectList (Json.Decode.list Json.Decode.string)
-        }
 
 
 subscriptions : Model -> Sub Msg

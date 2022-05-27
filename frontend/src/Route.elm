@@ -39,8 +39,7 @@ type Route
     = Home (Maybe SearchQuery)
     | Project ProjectName (Maybe SearchQuery)
     | ProjectLanguage ProjectName Language (Maybe SearchQuery)
-    | ProjectLanguagePage ProjectName Language PagePath (Maybe SearchQuery)
-    | ProjectLanguagePageSection ProjectName Language PagePath SectionID (Maybe SearchQuery)
+    | ProjectLanguagePage ProjectName Language PagePath (Maybe SectionID) (Maybe SearchQuery)
     | NotFound
 
 
@@ -58,35 +57,31 @@ toString : Route -> String
 toString route =
     case route of
         Home searchQuery ->
-            Url.Builder.absolute [ "/" ] (searchQuerytoParams searchQuery)
+            Url.Builder.absolute [] (maybeParam "q" searchQuery)
 
         Project projectName searchQuery ->
-            Url.Builder.absolute [ projectName ] (searchQuerytoParams searchQuery)
+            Url.Builder.absolute [ projectName ] (maybeParam "q" searchQuery)
 
         ProjectLanguage projectName language searchQuery ->
-            Url.Builder.absolute [ projectName, "-", language ] (searchQuerytoParams searchQuery)
+            Url.Builder.absolute [ projectName, "-", language ] (maybeParam "q" searchQuery)
 
-        ProjectLanguagePage projectName language pagePath searchQuery ->
-            Url.Builder.absolute [ projectName, "-", language, "-", pagePath ]
-                (searchQuerytoParams searchQuery)
-
-        ProjectLanguagePageSection projectName language pagePath sectionID searchQuery ->
+        ProjectLanguagePage projectName language pagePath sectionID searchQuery ->
             Url.Builder.absolute [ projectName, "-", language, "-", pagePath ]
                 (List.concat
-                    [ [ Url.Builder.string "id" sectionID ]
-                    , searchQuerytoParams searchQuery
+                    [ maybeParam "id" sectionID
+                    , maybeParam "q" searchQuery
                     ]
                 )
 
         NotFound ->
-            Url.Builder.absolute [ "/" ] []
+            Url.Builder.absolute [] []
 
 
-searchQuerytoParams : Maybe SearchQuery -> List QueryParameter
-searchQuerytoParams searchQuery =
-    case searchQuery of
-        Just q ->
-            [ Url.Builder.string "q" q ]
+maybeParam : String -> Maybe String -> List QueryParameter
+maybeParam name value =
+    case value of
+        Just v ->
+            [ Url.Builder.string name v ]
 
         Nothing ->
             []
@@ -99,22 +94,6 @@ routeParser =
         , map Project (projectNameParser <?> Query.string "q")
         , map ProjectLanguage (projectNameParser </> s "-" </> string <?> Query.string "q")
         , map ProjectLanguagePage
-            (projectNameParser
-                </> s "-"
-                </> string
-                </> s "-"
-                </> pagePathParser
-                <?> Query.string "q"
-            )
-        , map
-            (\projectName language pagePath sectionID searchQuery ->
-                case sectionID of
-                    Just id ->
-                        ProjectLanguagePageSection projectName language pagePath id searchQuery
-
-                    Nothing ->
-                        ProjectLanguagePage projectName language pagePath searchQuery
-            )
             (projectNameParser
                 </> s "-"
                 </> string

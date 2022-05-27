@@ -4,6 +4,7 @@ import Browser
 import Browser.Navigation as Nav
 import Html exposing (..)
 import Html.Attributes exposing (..)
+import Route exposing (Route, toRoute)
 import Url
 
 
@@ -22,12 +23,13 @@ main =
 type alias Model =
     { key : Nav.Key
     , url : Url.Url
+    , route : Route
     }
 
 
 init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
 init _ url key =
-    ( Model key url, Cmd.none )
+    ( { key = key, url = url, route = toRoute (Url.toString url) }, Cmd.none )
 
 
 type Msg
@@ -59,9 +61,9 @@ subscriptions _ =
 
 view : Model -> Browser.Document Msg
 view model =
-    { title = "URL Interceptor"
+    { title = "doctree"
     , body =
-        [ text "The current URL is: "
-        , b [] [ text (Url.toString model.url) ]
+        [ text "The current route is: "
+        , b [] [ text (Route.toString model.route) ]
         ]
     }

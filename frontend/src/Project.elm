@@ -10,6 +10,7 @@ import Element as E
 import Element.Background as Background
 import Element.Border as Border
 import Element.Font as Font
+import Element.Input exposing (search)
 import Element.Lazy
 import Element.Region as Region
 import Html.Attributes
@@ -421,7 +422,7 @@ viewProjectLanguagePage :
     -> Maybe SearchQuery
     -> Model
     -> Browser.Document Msg
-viewProjectLanguagePage _ projectName _ _ _ _ model =
+viewProjectLanguagePage _ projectName language pagePath _ searchQuery model =
     { title = "doctree"
     , body =
         [ case model.page of
@@ -448,8 +449,14 @@ viewProjectLanguagePage _ projectName _ _ _ _ model =
                                     , Background.color (E.rgb 0.95 0.95 0.95)
                                     ]
                                     (Element.Lazy.lazy
-                                        (\( v1, v2 ) -> sidebar v1 v2)
-                                        ( model.inViewSection, docPage )
+                                        (\v -> sidebar v.projectName v.language v.pagePath v.searchQuery v.inViewSection v.docPage)
+                                        { projectName = projectName
+                                        , language = language
+                                        , pagePath = pagePath
+                                        , searchQuery = searchQuery
+                                        , inViewSection = model.inViewSection
+                                        , docPage = docPage
+                                        }
                                     )
                                 , E.row
                                     [ E.width E.fill
@@ -572,8 +579,15 @@ logo =
         ]
 
 
-sidebar : String -> APISchema.Page -> E.Element msg
-sidebar inViewSection docPage =
+sidebar :
+    ProjectName
+    -> Language
+    -> PagePath
+    -> Maybe SearchQuery
+    -> String
+    -> APISchema.Page
+    -> E.Element msg
+sidebar projectName language pagePath searchQuery inViewSection docPage =
     E.column
         [ E.alignRight
         , E.width (E.px 350)
@@ -586,12 +600,20 @@ sidebar inViewSection docPage =
             , E.width E.fill
             , E.paddingEach { top = 0, right = 64, bottom = 128, left = 16 }
             ]
-            (sidebarSections inViewSection 0 docPage.sections)
+            (sidebarSections projectName language pagePath searchQuery inViewSection 0 docPage.sections)
         ]
 
 
-sidebarSections : String -> Int -> Schema.Sections -> E.Element msg
-sidebarSections inViewSection depth sections =
+sidebarSections :
+    ProjectName
+    -> Language
+    -> PagePath
+    -> Maybe SearchQuery
+    -> String
+    -> Int
+    -> Schema.Sections
+    -> E.Element msg
+sidebarSections projectName language pagePath searchQuery inViewSection depth sections =
     let
         list =
             case sections of
@@ -615,7 +637,14 @@ sidebarSections inViewSection depth sections =
                               else
                                 Font.medium
                             ]
-                            { url = "#"
+                            { url =
+                                Router.toString
+                                    (Router.ProjectLanguagePage projectName
+                                        language
+                                        pagePath
+                                        (Just section.id)
+                                        searchQuery
+                                    )
                             , label =
                                 E.text
                                     (if section.id == inViewSection then
@@ -625,7 +654,7 @@ sidebarSections inViewSection depth sections =
                                         section.shortLabel
                                     )
                             }
-                    , sidebarSections inViewSection (depth + 1) section.children
+                    , sidebarSections projectName language pagePath searchQuery inViewSection (depth + 1) section.children
                     ]
             )
             list

@@ -123,12 +123,20 @@ update msg model =
                     , route = route
                     , projectPage = Maybe.map (\( subModel, _ ) -> subModel) projectPage
                   }
-                , case projectPage of
-                    Just ( _, subCmds ) ->
-                        Cmd.map (\m -> ProjectPage m) subCmds
+                , Cmd.batch
+                    [ case route of
+                        Route.Home _ ->
+                            API.fetchProjectList GotProjectList
 
-                    Nothing ->
-                        Cmd.none
+                        _ ->
+                            Cmd.none
+                    , case projectPage of
+                        Just ( _, subCmds ) ->
+                            Cmd.map (\m -> ProjectPage m) subCmds
+
+                        Nothing ->
+                            Cmd.none
+                    ]
                 )
 
             else

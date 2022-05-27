@@ -3,7 +3,6 @@ module Project exposing (..)
 import API
 import APISchema
 import Browser
-import Browser.Dom
 import Browser.Navigation
 import Dict exposing (keys)
 import Element as E
@@ -12,7 +11,6 @@ import Element.Border as Border
 import Element.Font as Font
 import Element.Lazy
 import Element.Region as Region
-import Html exposing (Html)
 import Html.Attributes
 import Http
 import Json.Decode
@@ -61,19 +59,19 @@ init : Route -> ( Model, Cmd Msg )
 init route =
     case route of
         -- TODO: use searchQuery parameter
-        Project projectName searchQuery ->
+        Project projectName _ ->
             ( { pageID = Nothing, page = Nothing, inViewSection = "" }
             , Task.succeed () |> Task.perform (\_ -> GetProject projectName)
             )
 
         -- TODO: use searchQuery parameter
-        ProjectLanguage projectName language searchQuery ->
+        ProjectLanguage projectName _ _ ->
             ( { pageID = Nothing, page = Nothing, inViewSection = "" }
             , Task.succeed () |> Task.perform (\_ -> GetProject projectName)
             )
 
         -- TODO: use searchQuery parameter
-        ProjectLanguagePage projectName language pagePath sectionID searchQuery ->
+        ProjectLanguagePage projectName language pagePath _ _ ->
             let
                 pageID =
                     { projectName = projectName
@@ -221,7 +219,7 @@ viewProject :
     -> Bool
     -> Model
     -> Browser.Document Msg
-viewProject search projectIndexesRequest projectName searchQuery cloudMode model =
+viewProject search projectIndexesRequest projectName _ cloudMode _ =
     { title = "doctree"
     , body =
         [ case projectIndexesRequest of
@@ -289,7 +287,7 @@ viewProjectLanguage :
     -> Bool
     -> Model
     -> Browser.Document Msg
-viewProjectLanguage search projectIndexesRequest projectName language searchQuery cloudMode model =
+viewProjectLanguage _ projectIndexesRequest projectName language _ cloudMode _ =
     { title = "doctree"
     , body =
         [ case projectIndexesRequest of
@@ -382,13 +380,13 @@ viewProjectLanguagePage :
     -> Bool
     -> Model
     -> Browser.Document Msg
-viewProjectLanguagePage search projectIndexesRequest projectName language pagePath searchQuery sectionID cloudMode model =
+viewProjectLanguagePage _ projectIndexesRequest projectName _ _ _ _ cloudMode model =
     { title = "doctree"
     , body =
         [ case projectIndexesRequest of
             Just projectIndexesResponse ->
                 case projectIndexesResponse of
-                    Ok projectIndexes ->
+                    Ok _ ->
                         case model.page of
                             Just response ->
                                 case response of

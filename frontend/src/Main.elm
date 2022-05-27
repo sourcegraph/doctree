@@ -1,6 +1,7 @@
 module Main exposing (Model, Msg(..), init, main, subscriptions, update, view)
 
 import API
+import APISchema
 import Browser
 import Browser.Navigation as Nav
 import Flags exposing (Flags)
@@ -11,6 +12,7 @@ import Http
 import Route exposing (Route, toRoute)
 import Search
 import Url
+import Util
 
 
 main : Program Flags Model Msg
@@ -32,6 +34,8 @@ type alias Model =
     , route : Route
     , projectList : Maybe (Result Http.Error (List String))
     , search : Search.Model
+    , currentProjectName : Maybe String
+    , projectIndexes : Maybe (Result Http.Error APISchema.ProjectIndexes)
     }
 
 
@@ -50,6 +54,8 @@ init flags url key =
       , route = route
       , projectList = Nothing
       , search = searchModel
+      , currentProjectName = Nothing
+      , projectIndexes = Nothing
       }
     , Cmd.batch
         [ case route of
@@ -68,6 +74,8 @@ type Msg
     | UrlChanged Url.Url
     | GotProjectList (Result Http.Error (List String))
     | SearchMsg Search.Msg
+    | GetProject String
+    | GotProject (Result Http.Error APISchema.ProjectIndexes)
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -97,6 +105,22 @@ update msg model =
             ( { model | search = searchModel }
             , Cmd.map (\v -> SearchMsg v) searchCmd
             )
+
+        GetProject projectName ->
+            Maybe.withDefault
+                -- No project loaded yet, request it.
+                ( { model | currentProjectName = Just projectName }
+                , API.fetchProject GotProject projectName
+                )
+                -- Loaded already
+                (model.currentProjectName
+                    |> Maybe.andThen (Util.maybeEquals projectName)
+                    |> Maybe.andThen (\_ -> model.projectIndexes)
+                    |> Maybe.map (\_ -> ( model, Cmd.none ))
+                )
+
+        GotProject result ->
+            ( { model | projectIndexes = Just result }, Cmd.none )
 
 
 subscriptions : Model -> Sub Msg

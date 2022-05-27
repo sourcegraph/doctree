@@ -1,5 +1,6 @@
 module Search exposing (..)
 
+import API
 import APISchema
 import Browser.Dom
 import Element as E
@@ -96,7 +97,7 @@ update msg model =
                 ( { model | debounceIntent = model.debounceIntent - 1 }, Cmd.none )
 
         RunSearch intent ->
-            ( model, fetchSearchResults model.query intent model.projectName )
+            ( model, API.fetchSearchResults GotSearchResults model.query intent model.projectName )
 
         GotSearchResults results ->
             ( { model | results = Just results }, Cmd.none )
@@ -106,19 +107,6 @@ update msg model =
 
         NoOp ->
             ( model, Cmd.none )
-
-
-fetchSearchResults : String -> Bool -> Maybe String -> Cmd Msg
-fetchSearchResults query intent projectName =
-    Http.get
-        { url =
-            Url.Builder.absolute [ "api", "search" ]
-                [ Url.Builder.string "query" query
-                , Url.Builder.string "autocomplete" (Util.boolToString (intent == False))
-                , Url.Builder.string "project" (Maybe.withDefault "" projectName)
-                ]
-        , expect = Http.expectJson GotSearchResults APISchema.searchResultsDecoder
-        }
 
 
 

@@ -114,20 +114,11 @@ fetchSearchResults query intent projectName =
         { url =
             Url.Builder.absolute [ "api", "search" ]
                 [ Url.Builder.string "query" query
-                , Url.Builder.string "autocomplete" (boolToString (intent == False))
+                , Url.Builder.string "autocomplete" (Util.boolToString (intent == False))
                 , Url.Builder.string "project" (Maybe.withDefault "" projectName)
                 ]
         , expect = Http.expectJson GotSearchResults APISchema.searchResultsDecoder
         }
-
-
-boolToString : Bool -> String
-boolToString value =
-    if value then
-        "true"
-
-    else
-        "false"
 
 
 
@@ -176,14 +167,14 @@ searchResults request =
                                             [ Font.color (E.rgb 0.6 0.6 0.6)
                                             , Font.size 14
                                             ]
-                                            (E.text (shortProjectName r.path))
+                                            (E.text (Util.shortProjectName r.path))
                                         ]
                                     , E.el
                                         [ E.alignRight
                                         , Font.color (E.rgb 0.6 0.6 0.6)
                                         , Font.size 14
                                         ]
-                                        (E.text (shortProjectName r.projectName))
+                                        (E.text (Util.shortProjectName r.projectName))
                                     ]
                             )
                             results
@@ -194,17 +185,3 @@ searchResults request =
 
         Nothing ->
             E.text "loading.."
-
-
-shortProjectName : String -> String
-shortProjectName name =
-    trimPrefix name "github.com/"
-
-
-trimPrefix : String -> String -> String
-trimPrefix str prefix =
-    if String.startsWith prefix str then
-        String.dropLeft (String.length prefix) str
-
-    else
-        str

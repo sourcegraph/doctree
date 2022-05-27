@@ -35,3 +35,35 @@ maybeEquals v1 v2 =
 
     else
         Nothing
+
+
+shortProjectName : String -> String
+shortProjectName name =
+    trimPrefix name "github.com/"
+
+
+trimPrefix : String -> String -> String
+trimPrefix str prefix =
+    if String.startsWith prefix str then
+        String.dropLeft (String.length prefix) str
+
+    else
+        str
+
+
+trimSuffix : String -> String -> String
+trimSuffix str suffix =
+    if String.endsWith suffix str then
+        String.dropRight (String.length suffix) str
+
+    else
+        str
+
+
+boolToString : Bool -> String
+boolToString value =
+    if value then
+        "true"
+
+    else
+        "false"

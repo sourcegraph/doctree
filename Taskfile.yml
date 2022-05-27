@@ -39,7 +39,7 @@ tasks:
     desc: Run Elm frontend dev server
     dir: frontend
     cmds:
-      - npx elm-live src/Main.elm
+      - npx elm-live --dir public --pushstate true src/Main.elm -- --output=public/dist/elm.js
 
   build:
     desc: Build Go + Elm code in release mode

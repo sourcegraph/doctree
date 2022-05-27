@@ -26,3 +26,12 @@ httpErrorToString error =
 
         Http.BadBody errorMessage ->
             errorMessage
+
+
+maybeEquals : a -> a -> Maybe a
+maybeEquals v1 v2 =
+    if v1 == v2 then
+        Just v1
+
+    else
+        Nothing

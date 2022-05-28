@@ -133,6 +133,7 @@ type Msg
     | ObservePage
     | OnObserved (Result Json.Decode.Error (List Ports.ObserveEvent))
     | ScrollIntoViewLater String
+    | ReplaceUrlSilently String
 
 
 type UpdateMsg
@@ -214,16 +215,20 @@ update key msg model =
                       }
                     , case model.pageID of
                         Just p ->
-                            Browser.Navigation.replaceUrl key
-                                (Router.toString
-                                    -- TODO: Retain search query string
-                                    (Router.ProjectLanguagePage p.projectName
-                                        p.language
-                                        p.pagePath
-                                        (Just inViewSection)
-                                        Nothing
+                            Task.succeed ()
+                                |> Task.perform
+                                    (\_ ->
+                                        ReplaceUrlSilently
+                                            (Router.toString
+                                                -- TODO: Retain search query string
+                                                (Router.ProjectLanguagePage p.projectName
+                                                    p.language
+                                                    p.pagePath
+                                                    (Just inViewSection)
+                                                    Nothing
+                                                )
+                                            )
                                     )
-                                )
 
                         Nothing ->
                             Cmd.none

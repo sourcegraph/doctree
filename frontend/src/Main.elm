@@ -9,7 +9,7 @@ import Home
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Http
-import Project
+import Project exposing (Msg(..))
 import Route exposing (Route(..), toRoute)
 import Search
 import Url
@@ -83,6 +83,7 @@ init flags url key =
 
 type Msg
     = NoOp
+    | ReplaceUrlSilently String
     | LinkClicked Browser.UrlRequest
     | UrlChanged Url.Url
     | GotProjectList (Result Http.Error (List String))
@@ -98,6 +99,34 @@ update msg model =
     case msg of
         NoOp ->
             ( model, Cmd.none )
+
+        ReplaceUrlSilently newAbsoluteUrl ->
+            let
+                prefix =
+                    Url.toString
+                        { protocol = model.url.protocol
+                        , host = model.url.host
+                        , port_ = model.url.port_
+                        , path = ""
+                        , query = Nothing
+                        , fragment = Nothing
+                        }
+
+                newUrl =
+                    Url.fromString (String.concat [ prefix, newAbsoluteUrl ])
+            in
+            case newUrl of
+                Just url ->
+                    -- Note: By updating URL here, we ensure UrlChanged msg does nothing
+                    ( { model
+                        | url = url
+                        , route = toRoute (Url.toString url)
+                      }
+                    , Nav.replaceUrl model.key newAbsoluteUrl
+                    )
+
+                Nothing ->
+                    ( model, Cmd.none )
 
         LinkClicked urlRequest ->
             case urlRequest of
@@ -205,8 +234,13 @@ update msg model =
 
 
 subscriptions : Model -> Sub Msg
-subscriptions _ =
-    Sub.none
+subscriptions model =
+    case model.projectPage of
+        Just subModel ->
+            Sub.map (\m -> ProjectPage m) (Project.subscriptions subModel)
+
+        Nothing ->
+            Sub.none
 
 
 view : Model -> Browser.Document Msg
@@ -333,6 +367,9 @@ mapProjectMsg msg =
 
         Project.ScrollIntoViewLater id ->
             ProjectPageUpdate (Project.UpdateScrollIntoViewLater id)
+
+        Project.ReplaceUrlSilently newUrl ->
+            ReplaceUrlSilently newUrl
 
 
 {-| Whether or not the two ProjectLanguagePage routes are equal

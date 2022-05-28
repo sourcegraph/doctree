@@ -225,7 +225,7 @@ update msg model =
                 Just oldSubModel ->
                     let
                         ( subModel, subCmds ) =
-                            Project.update model.key subMsg oldSubModel
+                            Project.update subMsg oldSubModel
                     in
                     ( { model | projectPage = Just subModel }, Cmd.map (\m -> ProjectPage m) subCmds )
 

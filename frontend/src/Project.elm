@@ -4,7 +4,6 @@ import API
 import APISchema
 import Browser
 import Browser.Dom
-import Browser.Navigation
 import Dict exposing (keys)
 import Element as E
 import Element.Background as Background
@@ -121,6 +120,31 @@ scrollIntoView id =
         |> Task.andThen (\y -> Browser.Dom.setViewportOf "content-area" 0 y)
 
 
+sidebarScrollIntoView : String -> Cmd Msg
+sidebarScrollIntoView sectionID =
+    let
+        id =
+            String.concat [ sectionID, "-sidebar" ]
+    in
+    Browser.Dom.getViewportOf "sidebar-area"
+        |> Task.andThen
+            (\contentArea ->
+                Task.map
+                    (\info -> contentArea.viewport.y - (contentArea.viewport.height / 2.0) + info.element.y)
+                    (Browser.Dom.getElement id)
+            )
+        |> Task.andThen (\y -> Browser.Dom.setViewportOf "sidebar-area" 0 y)
+        |> Task.attempt
+            (\result ->
+                case result of
+                    Ok _ ->
+                        NoOp
+
+                    Err err ->
+                        NoOp
+            )
+
+
 
 -- TODO: cleanup this distinction between Msg and UpdateMsg
 
@@ -145,8 +169,8 @@ type UpdateMsg
     | NavigateToSectionID (Maybe SectionID)
 
 
-update : Browser.Navigation.Key -> UpdateMsg -> Model -> ( Model, Cmd Msg )
-update key msg model =
+update : UpdateMsg -> Model -> ( Model, Cmd Msg )
+update msg model =
     case msg of
         UpdateNoOp ->
             ( model, Cmd.none )
@@ -213,25 +237,28 @@ update key msg model =
                     ( { model
                         | inViewSection = inViewSection
                       }
-                    , case model.pageID of
-                        Just p ->
-                            Task.succeed ()
-                                |> Task.perform
-                                    (\_ ->
-                                        ReplaceUrlSilently
-                                            (Router.toString
-                                                -- TODO: Retain search query string
-                                                (Router.ProjectLanguagePage p.projectName
-                                                    p.language
-                                                    p.pagePath
-                                                    (Just inViewSection)
-                                                    Nothing
+                    , Cmd.batch
+                        [ sidebarScrollIntoView inViewSection
+                        , case model.pageID of
+                            Just p ->
+                                Task.succeed ()
+                                    |> Task.perform
+                                        (\_ ->
+                                            ReplaceUrlSilently
+                                                (Router.toString
+                                                    -- TODO: Retain search query string
+                                                    (Router.ProjectLanguagePage p.projectName
+                                                        p.language
+                                                        p.pagePath
+                                                        (Just inViewSection)
+                                                        Nothing
+                                                    )
                                                 )
-                                            )
-                                    )
+                                        )
 
-                        Nothing ->
-                            Cmd.none
+                            Nothing ->
+                                Cmd.none
+                        ]
                     )
 
                 Err _ ->
@@ -608,6 +635,7 @@ sidebar projectName language pagePath searchQuery inViewSection docPage =
         , E.width (E.px 350)
         , E.height E.fill
         , E.scrollbarY
+        , E.htmlAttribute (Html.Attributes.id "sidebar-area")
         ]
         [ E.link [ E.centerX, E.paddingXY 0 16 ] { url = "/", label = logo }
         , E.el
@@ -640,12 +668,17 @@ sidebarSections projectName language pagePath searchQuery inViewSection depth se
             (\section ->
                 E.column [ E.paddingEach { top = 0, right = 0, bottom = 0, left = 32 * depth } ]
                     [ if section.category then
-                        Style.h4 [ E.paddingXY 0 16 ] (E.text section.label)
+                        Style.h4
+                            [ E.paddingXY 0 16
+                            , E.htmlAttribute (Html.Attributes.id (String.concat [ section.id, "-sidebar" ]))
+                            ]
+                            (E.text section.label)
 
                       else
                         E.link
                             [ Font.underline
                             , E.paddingXY 0 8
+                            , E.htmlAttribute (Html.Attributes.id (String.concat [ section.id, "-sidebar" ]))
                             , if section.id == inViewSection then
                                 Font.bold
 
@@ -663,7 +696,7 @@ sidebarSections projectName language pagePath searchQuery inViewSection depth se
                             , label =
                                 E.text
                                     (if section.id == inViewSection then
-                                        String.concat [ "* ", section.shortLabel ]
+                                        String.concat [ section.shortLabel, " *" ]
 
                                      else
                                         section.shortLabel

@@ -669,7 +669,7 @@ sidebarSections projectName language pagePath searchQuery inViewSection depth se
                 E.column [ E.paddingEach { top = 0, right = 0, bottom = 0, left = 16 * depth } ]
                     [ if section.category then
                         Style.h4
-                            [ E.paddingXY 0 16
+                            [ E.paddingXY 8 16
                             , E.htmlAttribute (Html.Attributes.id (String.concat [ section.id, "-sidebar" ]))
                             ]
                             (E.text section.label)

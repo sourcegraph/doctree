@@ -3,6 +3,7 @@ package python
 
 import (
 	"context"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -48,6 +49,8 @@ func (i *pythonIndexer) IndexDir(ctx context.Context, dir string) (*schema.Index
 	bytes := 0
 	mods := map[string]moduleInfo{}
 	functionsByMod := map[string][]schema.Section{}
+	classesByMod := map[string][]schema.Section{}
+
 	for _, path := range sources {
 		if strings.Contains(path, "test_") || strings.Contains(path, "_test") || strings.Contains(path, "tests") {
 			continue
@@ -114,18 +117,37 @@ func (i *pythonIndexer) IndexDir(ctx context.Context, dir string) (*schema.Index
 			}
 		}
 
+		funcDefQuery := `
+		(
+		function_definition
+			name: (identifier) @func_name
+			parameters: (parameters) @func_params
+			return_type: (type)? @func_result
+			body: (block . (expression_statement (string) @func_docs)?)
+		)
+		`
+
 		// Function definitions
 		{
+			moduleFuncDefQuery := fmt.Sprintf("(module %s)", funcDefQuery)
+			modFunctions, err := getFunctions(n, content, moduleFuncDefQuery)
+			if err != nil {
+				return nil, err
+			}
+
+			functionsByMod[modName] = modFunctions
+		}
+
+		// Classes and their methods
+		{
+			// Find out all the classes
 			query, err := sitter.NewQuery([]byte(`
-			(
-				module
-				(
-				function_definition
-					name: (identifier) @func_name
-					parameters: (parameters) @func_params
-					return_type: (type)? @func_result
-					body: (block . (expression_statement (string) @func_docs)?)
-				)
+			(class_definition
+				name: (identifier) @class_name
+				superclasses: (argument_list)? @superclasses
+				body: (block
+					(expression_statement (string) @class_docs)?
+				) @class_body
 			)
 			`), python.GetLanguage())
 			if err != nil {
@@ -137,6 +159,7 @@ func (i *pythonIndexer) IndexDir(ctx context.Context, dir string) (*schema.Index
 			defer cursor.Close()
 			cursor.Exec(query, n)
 
+			// Iterate over the classes
 			for {
 				match, ok := cursor.NextMatch()
 				if !ok {
@@ -144,29 +167,33 @@ func (i *pythonIndexer) IndexDir(ctx context.Context, dir string) (*schema.Index
 				}
 				captures := getCaptures(query, match)
 
-				funcDocs := joinCaptures(content, captures["func_docs"], "\n")
-				funcDocs = sanitizeDocs(funcDocs)
-				funcName := firstCaptureContentOr(content, captures["func_name"], "")
-				funcParams := firstCaptureContentOr(content, captures["func_params"], "")
-				funcResult := firstCaptureContentOr(content, captures["func_result"], "")
+				className := firstCaptureContentOr(content, captures["class_name"], "")
+				superClasses := firstCaptureContentOr(content, captures["superclasses"], "")
+				classDocs := joinCaptures(content, captures["class_docs"], "\n")
+				classDocs = sanitizeDocs(classDocs)
 
-				if len(funcName) > 0 && funcName[0] == '_' && funcName[len(funcName)-1] != '_' {
-					continue // unexported (private function)
+				classLabel := schema.Markdown("class " + className + superClasses)
+				classes := classesByMod[modName]
+
+				// Extract class methods:
+				var classMethods []schema.Section
+				classBodyNodes := captures["class_body"]
+				if len(classBodyNodes) > 0 {
+					classMethods, err = getFunctions(classBodyNodes[0], content, funcDefQuery)
+					if err != nil {
+						return nil, err
+					}
 				}
 
-				funcLabel := schema.Markdown("def " + funcName + funcParams)
-				if funcResult != "" {
-					funcLabel = funcLabel + schema.Markdown(" -> "+funcResult)
-				}
-				funcs := functionsByMod[modName]
-				funcs = append(funcs, schema.Section{
-					ID:         funcName,
-					ShortLabel: funcName,
-					Label:      funcLabel,
-					Detail:     schema.Markdown(funcDocs),
-					SearchKey:  []string{modName, ".", funcName},
+				classes = append(classes, schema.Section{
+					ID:         className,
+					ShortLabel: className,
+					Label:      classLabel,
+					Detail:     schema.Markdown(classDocs),
+					SearchKey:  []string{modName, ".", className},
+					Children:   classMethods,
 				})
-				functionsByMod[modName] = funcs
+				classesByMod[modName] = classes
 			}
 		}
 	}
@@ -182,12 +209,21 @@ func (i *pythonIndexer) IndexDir(ctx context.Context, dir string) (*schema.Index
 			Children:   functionsByMod[modName],
 		}
 
+		classesSection := schema.Section{
+			ID:         "class",
+			ShortLabel: "class",
+			Label:      "Classes",
+			SearchKey:  []string{},
+			Category:   true,
+			Children:   classesByMod[modName],
+		}
+
 		pages = append(pages, schema.Page{
 			Path:      moduleInfo.path,
 			Title:     "Module " + modName,
 			Detail:    schema.Markdown(moduleInfo.docs),
 			SearchKey: []string{modName},
-			Sections:  []schema.Section{functionsSection},
+			Sections:  []schema.Section{functionsSection, classesSection},
 		})
 	}
 
@@ -207,6 +243,51 @@ func (i *pythonIndexer) IndexDir(ctx context.Context, dir string) (*schema.Index
 			},
 		},
 	}, nil
+}
+
+func getFunctions(node *sitter.Node, content []byte, q string) ([]schema.Section, error) {
+	var functions []schema.Section
+	query, err := sitter.NewQuery([]byte(q), python.GetLanguage())
+
+	if err != nil {
+		return nil, errors.Wrap(err, "NewQuery")
+	}
+	defer query.Close()
+
+	cursor := sitter.NewQueryCursor()
+	defer cursor.Close()
+	cursor.Exec(query, node)
+
+	for {
+		match, ok := cursor.NextMatch()
+		if !ok {
+			break
+		}
+		captures := getCaptures(query, match)
+		funcDocs := joinCaptures(content, captures["func_docs"], "\n")
+		funcDocs = sanitizeDocs(funcDocs)
+		funcName := firstCaptureContentOr(content, captures["func_name"], "")
+		funcParams := firstCaptureContentOr(content, captures["func_params"], "")
+		funcResult := firstCaptureContentOr(content, captures["func_result"], "")
+
+		if len(funcName) > 0 && funcName[0] == '_' && funcName[len(funcName)-1] != '_' {
+			continue // unexported (private function)
+		}
+
+		funcLabel := schema.Markdown("def " + funcName + funcParams)
+		if funcResult != "" {
+			funcLabel = funcLabel + schema.Markdown(" -> "+funcResult)
+		}
+		functions = append(functions, schema.Section{
+			ID:         funcName,
+			ShortLabel: funcName,
+			Label:      funcLabel,
+			Detail:     schema.Markdown(funcDocs),
+			SearchKey:  []string{funcName, ".", funcName},
+		})
+	}
+
+	return functions, nil
 }
 
 func sanitizeDocs(s string) string {

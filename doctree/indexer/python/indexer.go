@@ -130,7 +130,7 @@ func (i *pythonIndexer) IndexDir(ctx context.Context, dir string) (*schema.Index
 		// Function definitions
 		{
 			moduleFuncDefQuery := fmt.Sprintf("(module %s)", funcDefQuery)
-			modFunctions, err := getFunctions(n, content, moduleFuncDefQuery)
+			modFunctions, err := getFunctions(n, content, moduleFuncDefQuery, []string{modName})
 			if err != nil {
 				return nil, err
 			}
@@ -179,7 +179,10 @@ func (i *pythonIndexer) IndexDir(ctx context.Context, dir string) (*schema.Index
 				var classMethods []schema.Section
 				classBodyNodes := captures["class_body"]
 				if len(classBodyNodes) > 0 {
-					classMethods, err = getFunctions(classBodyNodes[0], content, funcDefQuery)
+					classMethods, err = getFunctions(
+						classBodyNodes[0], content, funcDefQuery,
+						[]string{modName, ".", className},
+					)
 					if err != nil {
 						return nil, err
 					}
@@ -245,7 +248,7 @@ func (i *pythonIndexer) IndexDir(ctx context.Context, dir string) (*schema.Index
 	}, nil
 }
 
-func getFunctions(node *sitter.Node, content []byte, q string) ([]schema.Section, error) {
+func getFunctions(node *sitter.Node, content []byte, q string, searchKeyPrefix []string) ([]schema.Section, error) {
 	var functions []schema.Section
 	query, err := sitter.NewQuery([]byte(q), python.GetLanguage())
 
@@ -283,7 +286,7 @@ func getFunctions(node *sitter.Node, content []byte, q string) ([]schema.Section
 			ShortLabel: funcName,
 			Label:      funcLabel,
 			Detail:     schema.Markdown(funcDocs),
-			SearchKey:  []string{funcName, ".", funcName},
+			SearchKey:  append(searchKeyPrefix, ".", funcName),
 		})
 	}
 

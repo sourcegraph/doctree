@@ -251,7 +251,6 @@ func (i *pythonIndexer) IndexDir(ctx context.Context, dir string) (*schema.Index
 func getFunctions(node *sitter.Node, content []byte, q string, searchKeyPrefix []string) ([]schema.Section, error) {
 	var functions []schema.Section
 	query, err := sitter.NewQuery([]byte(q), python.GetLanguage())
-
 	if err != nil {
 		return nil, errors.Wrap(err, "NewQuery")
 	}

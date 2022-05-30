@@ -134,15 +134,7 @@ sidebarScrollIntoView sectionID =
                     (Browser.Dom.getElement id)
             )
         |> Task.andThen (\y -> Browser.Dom.setViewportOf "sidebar-area" 0 y)
-        |> Task.attempt
-            (\result ->
-                case result of
-                    Ok _ ->
-                        NoOp
-
-                    Err err ->
-                        NoOp
-            )
+        |> Task.attempt (\_ -> NoOp)
 
 
 

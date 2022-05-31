@@ -62,6 +62,14 @@ Examples:
 				log.Fatal(err)
 			}
 		}()
+		if *cloudModeFlag {
+			go func() {
+				err := AutoIndexRepositories(*dataDirFlag, indexDataDir)
+				if err != nil {
+					log.Fatal(err)
+				}
+			}()
+		}
 		<-signals
 
 		return nil
@@ -483,4 +491,41 @@ func ListenAutoIndexedProjects(dataDirFlag *string) error {
 	<-done
 
 	return nil
+}
+
+// Periodically re-indexes Git repositories.
+func AutoIndexRepositories(dataDir, indexDataDir string) error {
+	ctx := context.Background()
+	for {
+		time.Sleep(1 * time.Minute)
+
+		projects, err := indexer.List(dataDir)
+		if err != nil {
+			return errors.Wrap(err, "List")
+		}
+		for _, projectName := range projects {
+			index, err := indexer.GetIndex(ctx, dataDir, indexDataDir, projectName, true)
+			if err != nil {
+				log.Println("Error: Failed to GetIndex", projectName, err)
+				continue
+			}
+			var first schema.Index
+			for _, langIndex := range index {
+				first = langIndex
+			}
+
+			repositoryURL := "https://" + projectName
+			log.Println("checking for updates", repositoryURL)
+			if err := indexer.CloneAndIndexIfOutdated(
+				ctx,
+				projectName,
+				repositoryURL,
+				dataDir,
+				first.GitCommitID,
+			); err != nil {
+				log.Println("faield to check for updates", repositoryURL, err)
+				continue
+			}
+		}
+	}
 }

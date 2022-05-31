@@ -256,6 +256,35 @@ func GetIndex(ctx context.Context, dataDir, indexDataDir, projectName string, au
 	return indexes, nil
 }
 
+func CloneAndIndexIfOutdated(ctx context.Context, projectName, repositoryURL, dataDir, indexedCommit string) error {
+	// Clone the repository into a temp dir.
+	dir, err := os.MkdirTemp(os.TempDir(), "doctree-clone")
+	if err != nil {
+		return errors.Wrap(err, "TempDir")
+	}
+	defer os.RemoveAll(dir)
+
+	cmd := exec.CommandContext(ctx, "git", "clone", "--depth=1", repositoryURL, "repo/")
+	cmd.Dir = dir
+
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("git %s: %v\n%s", strings.Join(cmd.Args, " "), err, out)
+	}
+
+	latestGitCommit, err := git.RevParse(dir, false, "HEAD")
+	if err != nil {
+		return errors.Wrap(err, "RevParse")
+	}
+	if indexedCommit != latestGitCommit {
+		// Index the repository.
+		if err := RunIndexers(ctx, filepath.Join(dir, "repo"), dataDir, projectName); err != nil {
+			return errors.Wrap(err, "RunIndexers")
+		}
+	}
+	return nil
+}
+
 func cloneAndIndex(ctx context.Context, repositoryURL, dataDir string) error {
 	// Clone the repository into a temp dir.
 	dir, err := os.MkdirTemp(os.TempDir(), "doctree-clone")

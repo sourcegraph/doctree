@@ -10,6 +10,7 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/pkg/errors"
+	"github.com/sourcegraph/doctree/doctree/git"
 )
 
 func getGitURIForFile(dir string) (string, error) {
@@ -57,7 +58,7 @@ func defaultDataDir() string {
 }
 
 func defaultProjectName(defaultDir string) string {
-	uri, err := getGitURIForFile(defaultDir)
+	uri, err := git.URIForFile(defaultDir)
 	if err != nil {
 		absDir, err := filepath.Abs(defaultDir)
 		if err != nil {

@@ -17,6 +17,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 	"github.com/sourcegraph/doctree/doctree/apischema"
+	"github.com/sourcegraph/doctree/doctree/git"
 	"github.com/sourcegraph/doctree/doctree/schema"
 )
 
@@ -95,6 +96,9 @@ func IndexDir(ctx context.Context, dir string) (map[string]*schema.Index, error)
 				start := time.Now()
 				index, err := indexer.IndexDir(ctx, dir)
 				if index != nil {
+					index.GitRepository, _ = git.URIForFile(dir)
+					index.GitCommitID, _ = git.RevParse(dir, false, "HEAD")
+					index.GitRefName, _ = git.RevParse(dir, true, "HEAD")
 					index.DurationSeconds = time.Since(start).Seconds()
 					index.CreatedAt = time.Now().Format(time.RFC3339)
 					index.Directory = absDir
@@ -344,7 +348,7 @@ func RunIndexers(ctx context.Context, dir, dataDir, projectName string) error {
 // this file is how we'd determine which directories need to be re-indexed / removed.
 //
 // An incrementing integer. No relation to other version numbers.
-const projectDirVersion = "1"
+const projectDirVersion = "2"
 
 // The version stored in e.g. ~/.doctree/version - indicating the version of the overall data
 // directory. If we need to change the directory structure in some way, change the autoindex file

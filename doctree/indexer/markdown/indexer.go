@@ -67,7 +67,6 @@ func (i *markdownIndexer) IndexDir(ctx context.Context, dir string) (*schema.Ind
 		Libraries: []schema.Library{
 			{
 				Name:        "TODO",
-				Repository:  "TODO",
 				ID:          "TODO",
 				Version:     "TODO",
 				VersionType: "TODO",

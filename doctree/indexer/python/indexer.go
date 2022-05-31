@@ -238,7 +238,6 @@ func (i *pythonIndexer) IndexDir(ctx context.Context, dir string) (*schema.Index
 		Libraries: []schema.Library{
 			{
 				Name:        "TODO",
-				Repository:  "TODO",
 				ID:          "TODO",
 				Version:     "TODO",
 				VersionType: "TODO",

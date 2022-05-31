@@ -406,7 +406,6 @@ func (i *goIndexer) IndexDir(ctx context.Context, dir string) (*schema.Index, er
 		Libraries: []schema.Library{
 			{
 				Name:        "TODO",
-				Repository:  "TODO",
 				ID:          "TODO",
 				Version:     "TODO",
 				VersionType: "TODO",

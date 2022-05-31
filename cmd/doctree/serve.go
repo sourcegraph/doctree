@@ -504,7 +504,7 @@ func AutoIndexRepositories(dataDir, indexDataDir string) error {
 	for {
 		time.Sleep(1 * time.Minute)
 
-		projects, err := indexer.List(dataDir)
+		projects, err := indexer.List(indexDataDir)
 		if err != nil {
 			return errors.Wrap(err, "List")
 		}

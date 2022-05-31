@@ -16,6 +16,26 @@ type Index struct {
 	// Directory that was indexed (absolute path.)
 	Directory string `json:"directory"`
 
+	// GitRepository is the normalized Git repository URI. e.g. "https://github.com/golang/go" or
+	// "git@github.com:golang/go" - the same value reported by `git config --get remote.origin.url`
+	// with `git@github.com:foo/bar` rewritten to `git://github.com/foo/bar`, credentials removed,
+	// any ".git" suffix removed, and any leading "/" prefix removed.
+	//
+	// Empty string if the indexed directory was not a Git repository.
+	GitRepository string `json:"gitRepository"`
+
+	// GitCommitID is the SHA commit hash of the Git repository revision at the time of indexing, as
+	// reported by `git rev-parse HEAD`.
+	//
+	// Empty string if the indexed directory was not a Git repository.
+	GitCommitID string `json:"gitCommitID"`
+
+	// GitRefName is the current Git ref name (branch name, tag name, etc.) as reported by
+	// `git rev-parse --abbrev-ref HEAD`
+	//
+	// Empty string if the indexed directory was not a Git repository.
+	GitRefName string `json:"gitRefName"`
+
 	// CreatedAt time of the index (RFC3339)
 	CreatedAt string `json:"createdAt"`
 
@@ -62,10 +82,6 @@ var (
 type Library struct {
 	// Name of the library
 	Name string `json:"name"`
-
-	// Repository the documentation lives in, a Git remote URL. e.g. "https://github.com/golang/go"
-	// or "git@github.com:golang/go"
-	Repository string `json:"repository"`
 
 	// ID of this repository. Many languages have a unique identifier, for example in Java this may
 	// be "com.google.android.webview" in Python it may be the PyPi package name. For Rust, the

@@ -9,6 +9,9 @@ indexDecoder =
     Decode.succeed Index
         |> Pipeline.required "schemaVersion" Decode.string
         |> Pipeline.required "directory" Decode.string
+        |> Pipeline.required "gitRepository" Decode.string
+        |> Pipeline.required "gitCommitID" Decode.string
+        |> Pipeline.required "gitRefName" Decode.string
         |> Pipeline.required "createdAt" Decode.string
         |> Pipeline.required "numFiles" Decode.int
         |> Pipeline.required "numBytes" Decode.int
@@ -22,6 +25,22 @@ type alias Index =
       schemaVersion : String
     , -- Directory that was indexed (absolute path.)
       directory : String
+    , -- GitRepository is the normalized Git repository URI. e.g. "https://github.com/golang/go" or
+      -- "git@github.com:golang/go" - the same value reported by `git config --get remote.origin.url`
+      -- with `git@github.com:foo/bar` rewritten to `git://github.com/foo/bar`, credentials removed,
+      -- any ".git" suffix removed, and any leading "/" prefix removed.
+      --
+      -- Empty string if the indexed directory was not a Git repository.
+      gitRepository : String
+    , -- GitCommitID is the SHA commit hash of the Git repository revision at the time of indexing, as
+      -- reported by `git rev-parse HEAD`.
+      --
+      -- Empty string if the indexed directory was not a Git repository.
+      gitCommitID : String
+    , -- GitRefName is the current Git ref name (branch name, tag name, etc.) as reported by `git rev-parse --abbrev-ref HEAD`
+      --
+      -- Empty string if the indexed directory was not a Git repository.
+      gitRefName : String
     , -- CreatedAt time of the index (RFC3339)
       createdAt : String
     , -- NumFiles indexed.
@@ -56,7 +75,6 @@ libraryDecoder : Decoder Library
 libraryDecoder =
     Decode.succeed Library
         |> Pipeline.required "name" Decode.string
-        |> Pipeline.required "repository" Decode.string
         |> Pipeline.required "id" Decode.string
         |> Pipeline.required "version" Decode.string
         |> Pipeline.required "versionType" Decode.string
@@ -66,9 +84,6 @@ libraryDecoder =
 type alias Library =
     { -- Name of the library
       name : String
-    , -- Repository the documentation lives in, a Git remote URL. e.g. "https://github.com/golang/go"
-      -- or "git@github.com:golang/go"
-      repository : String
     , -- ID of this repository. Many languages have a unique identifier, for example in Java this may
       -- be "com.google.android.webview" in Python it may be the PyPi package name. For Rust, the
       -- Cargo crate name, etc.

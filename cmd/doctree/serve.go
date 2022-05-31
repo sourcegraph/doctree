@@ -55,6 +55,11 @@ Examples:
 		signals := make(chan os.Signal, 1)
 		signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
 
+		err := indexer.RunMigrations(context.Background(), *cloudModeFlag, *dataDirFlag, indexDataDir)
+		if err != nil {
+			log.Fatal(err)
+		}
+
 		go Serve(*cloudModeFlag, *httpFlag, *dataDirFlag, indexDataDir)
 		go func() {
 			err := ListenAutoIndexedProjects(dataDirFlag)

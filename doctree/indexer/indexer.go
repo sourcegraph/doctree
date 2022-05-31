@@ -403,3 +403,42 @@ func ensureDataDir(dataDir string) error {
 	}
 	return nil
 }
+
+// RunMigrations handles upgrades to new doctree versions, if necessary.
+func RunMigrations(ctx context.Context, cloudMode bool, dataDir, indexDataDir string) error {
+	projects, err := List(indexDataDir)
+	if err != nil {
+		return errors.Wrap(err, "List")
+	}
+
+	for _, projectName := range projects {
+		projectDir := filepath.Join(indexDataDir, encodeProjectName(projectName))
+
+		data, err := os.ReadFile(filepath.Join(projectDir, "version"))
+		if err != nil {
+			return errors.Wrap(err, "Read project version")
+		}
+
+		if string(data) != projectDirVersion {
+			// Project dir version has changed. Need to reindex.
+			if cloudMode {
+				log.Println("migration: doctree schema has changed, reindexing:", projectName)
+				repositoryURL := "https://" + projectName
+				log.Println("cloning", repositoryURL)
+				err := cloneAndIndex(ctx, repositoryURL, dataDir)
+				if err != nil {
+					log.Println("migration: failed to reindex", repositoryURL, err)
+					continue
+				}
+			} else {
+				// Auto indexer should index the project again, or if not in auto index list then
+				// user needs to rerun index command manually.
+				log.Println("migration: doctree schema has changed, removing:", projectName)
+				if err := os.RemoveAll(projectDir); err != nil {
+					return errors.Wrap(err, "RemoveAll")
+				}
+			}
+		}
+	}
+	return nil
+}

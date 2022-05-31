@@ -166,7 +166,7 @@ func List(indexDataDir string) ([]string, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "ReadDir")
 	}
-	var indexes []string
+	indexes := []string{}
 	for _, info := range dir {
 		if info.IsDir() {
 			indexes = append(indexes, decodeProjectName(info.Name()))

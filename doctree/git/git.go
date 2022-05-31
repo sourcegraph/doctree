@@ -44,3 +44,22 @@ func normalizeGitURL(gitURL string) (string, error) {
 	p = strings.TrimPrefix(p, "/")
 	return fmt.Sprintf("%s/%s", u.Hostname(), p), nil
 }
+
+func RevParse(dir string, abbrefRef bool, rev string) (string, error) {
+	var cmd *exec.Cmd
+	if abbrefRef {
+		cmd = exec.Command("git", "rev-parse", "--abbrev-ref", rev)
+	} else {
+		cmd = exec.Command("git", "rev-parse", "--get", rev)
+	}
+	absDir, err := filepath.Abs(dir)
+	if err != nil {
+		return "", errors.Wrapf(err, "failed to get absolute path for %s", dir)
+	}
+	cmd.Dir = absDir
+	out, err := cmd.Output()
+	if err != nil {
+		return "", errors.Wrapf(err, "git rev-parse ... (pwd=%s)", cmd.Dir)
+	}
+	return string(out), nil
+}

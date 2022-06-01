@@ -272,13 +272,14 @@ func CloneAndIndexIfOutdated(ctx context.Context, projectName, repositoryURL, da
 		return fmt.Errorf("git %s: %v\n%s", strings.Join(cmd.Args, " "), err, out)
 	}
 
-	latestGitCommit, err := git.RevParse(dir, false, "HEAD")
+	repoDir := filepath.Join(dir, "repo")
+	latestGitCommit, err := git.RevParse(repoDir, false, "HEAD")
 	if err != nil {
 		return errors.Wrap(err, "RevParse")
 	}
 	if indexedCommit != latestGitCommit {
 		// Index the repository.
-		if err := RunIndexers(ctx, filepath.Join(dir, "repo"), dataDir, projectName); err != nil {
+		if err := RunIndexers(ctx, repoDir, dataDir, projectName); err != nil {
 			return errors.Wrap(err, "RunIndexers")
 		}
 	}

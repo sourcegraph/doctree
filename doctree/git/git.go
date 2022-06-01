@@ -50,7 +50,7 @@ func RevParse(dir string, abbrefRef bool, rev string) (string, error) {
 	if abbrefRef {
 		cmd = exec.Command("git", "rev-parse", "--abbrev-ref", rev)
 	} else {
-		cmd = exec.Command("git", "rev-parse", "--get", rev)
+		cmd = exec.Command("git", "rev-parse", rev)
 	}
 	absDir, err := filepath.Abs(dir)
 	if err != nil {

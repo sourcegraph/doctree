@@ -54,6 +54,7 @@ func (i *goIndexer) IndexDir(ctx context.Context, dir string) (*schema.Index, er
 	varsByPackage := map[string][]schema.Section{}
 	typesByPackage := map[string][]schema.Section{}
 	functionsByPackage := map[string][]schema.Section{}
+	methodsByType := map[string][]schema.Section{}
 	for _, path := range sources {
 		if strings.HasSuffix(path, "_test.go") {
 			continue
@@ -187,6 +188,67 @@ func (i *goIndexer) IndexDir(ctx context.Context, dir string) (*schema.Index, er
 			}
 		}
 
+		// Method definitions
+		{
+			query, err := sitter.NewQuery([]byte(`
+				(
+					(comment)* @method_docs
+					.
+					(method_declaration
+						receiver: (parameter_list) @method_receiver
+						name: (field_identifier) @method_name
+						parameters: (parameter_list)? @method_params
+						result: (_)? @method_result
+					)
+				)
+			`), golang.GetLanguage())
+			if err != nil {
+				return nil, errors.Wrap(err, "NewQuery")
+			}
+			defer query.Close()
+
+			cursor := sitter.NewQueryCursor()
+			defer cursor.Close()
+			cursor.Exec(query, n)
+
+			for {
+				match, ok := cursor.NextMatch()
+				if !ok {
+					break
+				}
+				captures := getCaptures(query, match)
+
+				methodDocs := commentsToMarkdown(content, captures["method_docs"])
+				methodName := firstCaptureContentOr(content, captures["method_name"], "")
+				methodReceiver := firstCaptureContentOr(content, captures["method_receiver"], "")
+				methodParams := firstCaptureContentOr(content, captures["method_params"], "")
+				methodResult := firstCaptureContentOr(content, captures["method_result"], "")
+
+				methodType := strings.Split(methodReceiver, " ")[1]
+				methodType = strings.Replace(methodType, "*", "", -1)
+				methodType = strings.Replace(methodType, ")", "", -1)
+
+				firstRune := []rune(methodName)[0]
+				if string(firstRune) != strings.ToUpper(string(firstRune)) || string(firstRune) == "_" {
+					continue // unexported
+				}
+
+				methodLabel := schema.Markdown("func " + methodReceiver + " " + methodName + methodParams)
+				if methodResult != "" {
+					methodLabel = methodLabel + schema.Markdown(" "+methodResult)
+				}
+				methods := methodsByType[methodType]
+				methods = append(methods, schema.Section{
+					ID:         methodName,
+					ShortLabel: methodName,
+					Label:      methodLabel,
+					Detail:     schema.Markdown(methodDocs),
+					SearchKey:  []string{pkgName, ".", methodName},
+				})
+				methodsByType[methodType] = methods
+			}
+		}
+
 		// Type declarations
 		{
 			query, err := sitter.NewQuery([]byte(`
@@ -238,8 +300,8 @@ func (i *goIndexer) IndexDir(ctx context.Context, dir string) (*schema.Index, er
 				typeFunc := firstCaptureContentOr(content, captures["type_func"], "")
 				typeOther := firstCaptureContentOr(content, captures["type_other"], "")
 
-				firstRune := []rune(typeName)[0]
-				if string(firstRune) != strings.ToUpper(string(firstRune)) || string(firstRune) == "_" {
+				typeFirstRune := []rune(typeName)[0]
+				if string(typeFirstRune) != strings.ToUpper(string(typeFirstRune)) || string(typeFirstRune) == "_" {
 					continue // unexported
 				}
 
@@ -261,13 +323,17 @@ func (i *goIndexer) IndexDir(ctx context.Context, dir string) (*schema.Index, er
 				}
 
 				types := typesByPackage[pkgName]
-				types = append(types, schema.Section{
+				typeSchemaSection := schema.Section{
 					ID:         typeName,
 					ShortLabel: typeName,
 					Label:      typeLabel,
 					Detail:     schema.Markdown(fmt.Sprintf("```go\n%s\n```\n\n%s", typeDefinition, typeDocs)),
 					SearchKey:  []string{pkgName, ".", typeName},
-				})
+				}
+				if methodSchemaSection, methodExist := methodsByType[typeName]; methodExist {
+					typeSchemaSection.Children = methodSchemaSection
+				}
+				types = append(types, typeSchemaSection)
 				typesByPackage[pkgName] = types
 			}
 		}

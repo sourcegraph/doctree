@@ -55,6 +55,11 @@ Examples:
 		signals := make(chan os.Signal, 1)
 		signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
 
+		err := indexer.RunMigrations(context.Background(), *cloudModeFlag, *dataDirFlag, indexDataDir)
+		if err != nil {
+			log.Fatal(err)
+		}
+
 		go Serve(*cloudModeFlag, *httpFlag, *dataDirFlag, indexDataDir)
 		go func() {
 			err := ListenAutoIndexedProjects(dataDirFlag)
@@ -62,6 +67,14 @@ Examples:
 				log.Fatal(err)
 			}
 		}()
+		if *cloudModeFlag {
+			go func() {
+				err := AutoIndexRepositories(*dataDirFlag, indexDataDir)
+				if err != nil {
+					log.Fatal(err)
+				}
+			}()
+		}
 		<-signals
 
 		return nil
@@ -97,7 +110,44 @@ func Serve(cloudMode bool, addr, dataDir, indexDataDir string) {
 		}
 
 		w.Header().Set("Content-Type", "application/javascript")
-		fmt.Fprintf(w, `Elm.Main.init({flags: %s})`, flagsJson)
+		fmt.Fprintf(w, `
+let app = Elm.Main.init({flags: %s});
+
+let onObserved = (entries, observer) => {
+	if (app.ports.onObserved) {
+		app.ports.onObserved.send(entries.map(entry => {
+			let rootCenter = entry.rootBounds.y + (entry.rootBounds.height/2.0);
+			let entryCenter = entry.intersectionRect.y + (entry.intersectionRect.height/2.0);
+			let distanceToCenter = Math.abs(rootCenter - entryCenter);
+			// NOTE: distanceToCenter only updates, i.e. events are only sent, when threshold
+			// changes. So if the element is completely in view, distanceToCenter will not update.
+			return ({
+				isIntersecting: entry.isIntersecting,
+				intersectionRatio: entry.intersectionRatio,
+				distanceToCenter: distanceToCenter,
+				targetID: entry.target.id
+			});
+		}));
+	}
+};
+
+let observer = new IntersectionObserver(onObserved, {
+	threshold: 0, // 1px
+	// intersect when an element crosses the horizontal line at center of screen.
+	rootMargin: '-50%% 0%% -50%% 0%%',
+});
+
+app.ports.observeElementID.subscribe(function(id) {
+	requestAnimationFrame(() => {
+		let target = document.getElementById(id);
+		if (!target) {
+			console.error("warning: observeElementID given invalid ID: " + id);
+			return;
+		}
+		observer.observe(target);
+	});
+});
+`, flagsJson)
 	}))
 	mux.Handle("/api/list", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// SECURITY: This endpoint isn't mutable and doesn't serve privileged information, and
@@ -330,7 +380,7 @@ func Serve(cloudMode bool, addr, dataDir, indexDataDir string) {
 
 func frontendHandler(cloudMode bool) http.Handler {
 	if debugServer := os.Getenv("ELM_DEBUG_SERVER"); debugServer != "" {
-		// Reverse proxy to the elm-spa debug server for hot code reloading, etc.
+		// Reverse proxy to the elm-live debug server for hot code reloading, etc.
 		remote, err := url.Parse(debugServer)
 		if err != nil {
 			panic(err)
@@ -446,4 +496,41 @@ func ListenAutoIndexedProjects(dataDirFlag *string) error {
 	<-done
 
 	return nil
+}
+
+// Periodically re-indexes Git repositories.
+func AutoIndexRepositories(dataDir, indexDataDir string) error {
+	ctx := context.Background()
+	for {
+		time.Sleep(1 * time.Minute)
+
+		projects, err := indexer.List(indexDataDir)
+		if err != nil {
+			return errors.Wrap(err, "List")
+		}
+		for _, projectName := range projects {
+			index, err := indexer.GetIndex(ctx, dataDir, indexDataDir, projectName, true)
+			if err != nil {
+				log.Println("Error: Failed to GetIndex", projectName, err)
+				continue
+			}
+			var first schema.Index
+			for _, langIndex := range index {
+				first = langIndex
+			}
+
+			repositoryURL := "https://" + projectName
+			log.Println("checking for updates", repositoryURL)
+			if err := indexer.CloneAndIndexIfOutdated(
+				ctx,
+				projectName,
+				repositoryURL,
+				dataDir,
+				first.GitCommitID,
+			); err != nil {
+				log.Println("faield to check for updates", repositoryURL, err)
+				continue
+			}
+		}
+	}
 }

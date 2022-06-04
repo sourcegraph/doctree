@@ -17,6 +17,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 	"github.com/sourcegraph/doctree/doctree/apischema"
+	"github.com/sourcegraph/doctree/doctree/git"
 	"github.com/sourcegraph/doctree/doctree/schema"
 )
 
@@ -95,6 +96,9 @@ func IndexDir(ctx context.Context, dir string) (map[string]*schema.Index, error)
 				start := time.Now()
 				index, err := indexer.IndexDir(ctx, dir)
 				if index != nil {
+					index.GitRepository, _ = git.URIForFile(dir)
+					index.GitCommitID, _ = git.RevParse(dir, false, "HEAD")
+					index.GitRefName, _ = git.RevParse(dir, true, "HEAD")
 					index.DurationSeconds = time.Since(start).Seconds()
 					index.CreatedAt = time.Now().Format(time.RFC3339)
 					index.Directory = absDir
@@ -162,7 +166,7 @@ func List(indexDataDir string) ([]string, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "ReadDir")
 	}
-	var indexes []string
+	indexes := []string{}
 	for _, info := range dir {
 		if info.IsDir() {
 			indexes = append(indexes, decodeProjectName(info.Name()))
@@ -250,6 +254,36 @@ func GetIndex(ctx context.Context, dataDir, indexDataDir, projectName string, au
 		}
 	}
 	return indexes, nil
+}
+
+func CloneAndIndexIfOutdated(ctx context.Context, projectName, repositoryURL, dataDir, indexedCommit string) error {
+	// Clone the repository into a temp dir.
+	dir, err := os.MkdirTemp(os.TempDir(), "doctree-clone")
+	if err != nil {
+		return errors.Wrap(err, "TempDir")
+	}
+	defer os.RemoveAll(dir)
+
+	cmd := exec.CommandContext(ctx, "git", "clone", "--depth=1", repositoryURL, "repo/")
+	cmd.Dir = dir
+
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("git %s: %v\n%s", strings.Join(cmd.Args, " "), err, out)
+	}
+
+	repoDir := filepath.Join(dir, "repo")
+	latestGitCommit, err := git.RevParse(repoDir, false, "HEAD")
+	if err != nil {
+		return errors.Wrap(err, "RevParse")
+	}
+	if indexedCommit != latestGitCommit {
+		// Index the repository.
+		if err := RunIndexers(ctx, repoDir, dataDir, projectName); err != nil {
+			return errors.Wrap(err, "RunIndexers")
+		}
+	}
+	return nil
 }
 
 func cloneAndIndex(ctx context.Context, repositoryURL, dataDir string) error {
@@ -344,7 +378,7 @@ func RunIndexers(ctx context.Context, dir, dataDir, projectName string) error {
 // this file is how we'd determine which directories need to be re-indexed / removed.
 //
 // An incrementing integer. No relation to other version numbers.
-const projectDirVersion = "1"
+const projectDirVersion = "2"
 
 // The version stored in e.g. ~/.doctree/version - indicating the version of the overall data
 // directory. If we need to change the directory structure in some way, change the autoindex file
@@ -367,6 +401,45 @@ func ensureDataDir(dataDir string) error {
 	}
 	if err != nil {
 		return err
+	}
+	return nil
+}
+
+// RunMigrations handles upgrades to new doctree versions, if necessary.
+func RunMigrations(ctx context.Context, cloudMode bool, dataDir, indexDataDir string) error {
+	projects, err := List(indexDataDir)
+	if err != nil {
+		return errors.Wrap(err, "List")
+	}
+
+	for _, projectName := range projects {
+		projectDir := filepath.Join(indexDataDir, encodeProjectName(projectName))
+
+		data, err := os.ReadFile(filepath.Join(projectDir, "version"))
+		if err != nil {
+			return errors.Wrap(err, "Read project version")
+		}
+
+		if string(data) != projectDirVersion {
+			// Project dir version has changed. Need to reindex.
+			if cloudMode {
+				log.Println("migration: doctree schema has changed, reindexing:", projectName)
+				repositoryURL := "https://" + projectName
+				log.Println("cloning", repositoryURL)
+				err := cloneAndIndex(ctx, repositoryURL, dataDir)
+				if err != nil {
+					log.Println("migration: failed to reindex", repositoryURL, err)
+					continue
+				}
+			} else {
+				// Auto indexer should index the project again, or if not in auto index list then
+				// user needs to rerun index command manually.
+				log.Println("migration: doctree schema has changed, removing:", projectName)
+				if err := os.RemoveAll(projectDir); err != nil {
+					return errors.Wrap(err, "RemoveAll")
+				}
+			}
+		}
 	}
 	return nil
 }

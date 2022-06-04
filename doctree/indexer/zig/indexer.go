@@ -301,7 +301,6 @@ func (i *zigIndexer) IndexDir(ctx context.Context, dir string) (*schema.Index, e
 		Libraries: []schema.Library{
 			{
 				Name:        "TODO",
-				Repository:  "TODO",
 				ID:          "TODO",
 				Version:     "TODO",
 				VersionType: "TODO",

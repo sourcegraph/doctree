@@ -1,5 +1,6 @@
 module Search exposing (..)
 
+import API
 import APISchema
 import Browser.Dom
 import Element as E
@@ -96,7 +97,7 @@ update msg model =
                 ( { model | debounceIntent = model.debounceIntent - 1 }, Cmd.none )
 
         RunSearch intent ->
-            ( model, fetchSearchResults model.query intent model.projectName )
+            ( model, API.fetchSearchResults GotSearchResults model.query intent model.projectName )
 
         GotSearchResults results ->
             ( { model | results = Just results }, Cmd.none )
@@ -106,28 +107,6 @@ update msg model =
 
         NoOp ->
             ( model, Cmd.none )
-
-
-fetchSearchResults : String -> Bool -> Maybe String -> Cmd Msg
-fetchSearchResults query intent projectName =
-    Http.get
-        { url =
-            Url.Builder.absolute [ "api", "search" ]
-                [ Url.Builder.string "query" query
-                , Url.Builder.string "autocomplete" (boolToString (intent == False))
-                , Url.Builder.string "project" (Maybe.withDefault "" projectName)
-                ]
-        , expect = Http.expectJson GotSearchResults APISchema.searchResultsDecoder
-        }
-
-
-boolToString : Bool -> String
-boolToString value =
-    if value then
-        "true"
-
-    else
-        "false"
 
 
 
@@ -176,14 +155,14 @@ searchResults request =
                                             [ Font.color (E.rgb 0.6 0.6 0.6)
                                             , Font.size 14
                                             ]
-                                            (E.text (shortProjectName r.path))
+                                            (E.text (Util.shortProjectName r.path))
                                         ]
                                     , E.el
                                         [ E.alignRight
                                         , Font.color (E.rgb 0.6 0.6 0.6)
                                         , Font.size 14
                                         ]
-                                        (E.text (shortProjectName r.projectName))
+                                        (E.text (Util.shortProjectName r.projectName))
                                     ]
                             )
                             results
@@ -194,17 +173,3 @@ searchResults request =
 
         Nothing ->
             E.text "loading.."
-
-
-shortProjectName : String -> String
-shortProjectName name =
-    trimPrefix name "github.com/"
-
-
-trimPrefix : String -> String -> String
-trimPrefix str prefix =
-    if String.startsWith prefix str then
-        String.dropLeft (String.length prefix) str
-
-    else
-        str

@@ -1,108 +1,31 @@
-module Pages.Home_ exposing (Model, Msg, page)
+module Home exposing (Model, Msg(..), view)
 
+import Browser
 import Element as E
 import Element.Font as Font
 import Element.Lazy
-import Gen.Params.Home_ exposing (Params)
 import Http
-import Json.Decode as D
-import Page
-import Request
 import Search
-import Shared
 import Style
 import Util exposing (httpErrorToString)
-import View exposing (View)
-
-
-page : Shared.Model -> Request.With Params -> Page.With Model Msg
-page shared req =
-    Page.element
-        { init = init
-        , update = update
-        , view = view shared.flags.cloudMode
-        , subscriptions = subscriptions
-        }
-
-
-
--- INIT
 
 
 type alias Model =
-    { list : Maybe (Result Http.Error (List String))
+    { projectList : Maybe (Result Http.Error (List String))
     , search : Search.Model
     }
 
 
-init : ( Model, Cmd Msg )
-init =
-    let
-        ( searchModel, searchCmd ) =
-            Search.init Nothing
-    in
-    ( { list = Nothing
-      , search = searchModel
-      }
-    , Cmd.batch
-        [ fetchList
-        , Cmd.map (\v -> SearchMsg v) searchCmd
-        ]
-    )
-
-
-
--- UPDATE
-
-
 type Msg
-    = GotList (Result Http.Error (List String))
-    | SearchMsg Search.Msg
+    = SearchMsg Search.Msg
 
 
-update : Msg -> Model -> ( Model, Cmd Msg )
-update msg model =
-    case msg of
-        GotList list ->
-            ( { model | list = Just list }, Cmd.none )
-
-        SearchMsg searchMsg ->
-            let
-                ( searchModel, searchCmd ) =
-                    Search.update searchMsg model.search
-            in
-            ( { model | search = searchModel }
-            , Cmd.map (\v -> SearchMsg v) searchCmd
-            )
-
-
-fetchList : Cmd Msg
-fetchList =
-    Http.get
-        { url = "/api/list"
-        , expect = Http.expectJson GotList (D.list D.string)
-        }
-
-
-
--- SUBSCRIPTIONS
-
-
-subscriptions : Model -> Sub Msg
-subscriptions model =
-    Sub.none
-
-
-
--- VIEW
-
-
-view : Bool -> Model -> View Msg
+view : Bool -> Model -> Browser.Document Msg
 view cloudMode model =
     { title = "doctree"
     , body =
         [ E.layout (List.concat [ Style.layout, [ E.width E.fill ] ])
-            (case model.list of
+            (case model.projectList of
                 Just response ->
                     case response of
                         Ok list ->

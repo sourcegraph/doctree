@@ -70,6 +70,7 @@ var (
 	LanguageCpp        = Language{Title: "C++", ID: "cpp"}
 	LanguageGo         = Language{Title: "Go", ID: "go"}
 	LanguageJava       = Language{Title: "Java", ID: "java"}
+	LanguageJavaScript = Language{Title: "JavaScript", ID: "javascript"}
 	LanguageObjC       = Language{Title: "Objective-C", ID: "objc"}
 	LanguagePython     = Language{Title: "Python", ID: "python"}
 	LanguageTypeScript = Language{Title: "TypeScript", ID: "typescript"}

@@ -191,16 +191,24 @@ func (i *goIndexer) IndexDir(ctx context.Context, dir string) (*schema.Index, er
 		// Method definitions
 		{
 			query, err := sitter.NewQuery([]byte(`
-				(
-					(comment)* @method_docs
-					.
-					(method_declaration
-						receiver: (parameter_list) @method_receiver
-						name: (field_identifier) @method_name
-						parameters: (parameter_list)? @method_params
-						result: (_)? @method_result
-					)
+			(
+				(comment)* @method_docs
+				.
+				(method_declaration
+					receiver: (parameter_list
+					   (parameter_declaration 
+						 (pointer_type
+						   (type_identifier
+						   
+						   ) @type_identifier
+						 )
+					   ) 
+					) @method_receiver
+					name: (field_identifier) @method_name
+					parameters: (parameter_list)? @method_params
+					result: (_)? @method_result
 				)
+			)
 			`), golang.GetLanguage())
 			if err != nil {
 				return nil, errors.Wrap(err, "NewQuery")
@@ -221,12 +229,9 @@ func (i *goIndexer) IndexDir(ctx context.Context, dir string) (*schema.Index, er
 				methodDocs := commentsToMarkdown(content, captures["method_docs"])
 				methodName := firstCaptureContentOr(content, captures["method_name"], "")
 				methodReceiver := firstCaptureContentOr(content, captures["method_receiver"], "")
+				methodTypeIdentifier := firstCaptureContentOr(content, captures["type_identifier"], "")
 				methodParams := firstCaptureContentOr(content, captures["method_params"], "")
 				methodResult := firstCaptureContentOr(content, captures["method_result"], "")
-
-				methodType := strings.Split(methodReceiver, " ")[1]
-				methodType = strings.Replace(methodType, "*", "", -1)
-				methodType = strings.Replace(methodType, ")", "", -1)
 
 				firstRune := []rune(methodName)[0]
 				if string(firstRune) != strings.ToUpper(string(firstRune)) || string(firstRune) == "_" {
@@ -237,7 +242,7 @@ func (i *goIndexer) IndexDir(ctx context.Context, dir string) (*schema.Index, er
 				if methodResult != "" {
 					methodLabel = methodLabel + schema.Markdown(" "+methodResult)
 				}
-				methods := methodsByType[methodType]
+				methods := methodsByType[methodTypeIdentifier]
 				methods = append(methods, schema.Section{
 					ID:         methodName,
 					ShortLabel: methodName,
@@ -245,7 +250,7 @@ func (i *goIndexer) IndexDir(ctx context.Context, dir string) (*schema.Index, er
 					Detail:     schema.Markdown(methodDocs),
 					SearchKey:  []string{pkgName, ".", methodName},
 				})
-				methodsByType[methodType] = methods
+				methodsByType[methodTypeIdentifier] = methods
 			}
 		}
 
@@ -300,8 +305,8 @@ func (i *goIndexer) IndexDir(ctx context.Context, dir string) (*schema.Index, er
 				typeFunc := firstCaptureContentOr(content, captures["type_func"], "")
 				typeOther := firstCaptureContentOr(content, captures["type_other"], "")
 
-				typeFirstRune := []rune(typeName)[0]
-				if string(typeFirstRune) != strings.ToUpper(string(typeFirstRune)) || string(typeFirstRune) == "_" {
+				firstRune := []rune(typeName)[0]
+				if string(firstRune) != strings.ToUpper(string(firstRune)) || string(firstRune) == "_" {
 					continue // unexported
 				}
 

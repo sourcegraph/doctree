@@ -305,8 +305,8 @@ func (i *goIndexer) IndexDir(ctx context.Context, dir string) (*schema.Index, er
 				typeFunc := firstCaptureContentOr(content, captures["type_func"], "")
 				typeOther := firstCaptureContentOr(content, captures["type_other"], "")
 
-				typeFirstRune := []rune(typeName)[0]
-				if string(typeFirstRune) != strings.ToUpper(string(typeFirstRune)) || string(typeFirstRune) == "_" {
+				firstRune := []rune(typeName)[0]
+				if string(firstRune) != strings.ToUpper(string(firstRune)) || string(firstRune) == "_" {
 					continue // unexported
 				}
 

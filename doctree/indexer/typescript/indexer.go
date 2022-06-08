@@ -114,6 +114,7 @@ func (i *typescriptIndexer) IndexDir(ctx context.Context, dir string) (*schema.I
 	// Functions
 	{
 		for _, mod := range mods {
+			// NEXT: setup go code intel properly, then resume
 		}
 	}
 

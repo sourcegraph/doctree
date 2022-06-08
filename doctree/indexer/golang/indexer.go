@@ -197,11 +197,9 @@ func (i *goIndexer) IndexDir(ctx context.Context, dir string) (*schema.Index, er
 				(method_declaration
 					receiver: (parameter_list
 					   (parameter_declaration 
-						 (pointer_type
 						   (type_identifier
 						   
 						   ) @type_identifier
-						 )
 					   ) 
 					) @method_receiver
 					name: (field_identifier) @method_name

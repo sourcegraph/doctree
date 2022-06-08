@@ -4,8 +4,8 @@ package typescript
 import (
 	"context"
 	"io/fs"
+	"log"
 	"os"
-	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -53,6 +53,11 @@ func (i *typescriptIndexer) IndexDir(ctx context.Context, dir string) (*schema.I
 	classesByMod := map[string][]schema.Section{}
 
 	for _, path := range sources {
+		// DEBUG
+		if !strings.Contains(path, "renderer.ts") {
+			continue
+		}
+
 		if strings.Contains(path, "test_") || strings.Contains(path, "_test") || strings.Contains(path, "tests") || strings.Contains(path, "node_modules") {
 			continue
 		}
@@ -78,7 +83,7 @@ func (i *typescriptIndexer) IndexDir(ctx context.Context, dir string) (*schema.I
 		defer tree.Close()
 
 		// Inspect the root node.
-		n := tree.RootNode()
+		rootNode := tree.RootNode()
 
 		// Modules
 		var modName string = strings.ReplaceAll(strings.TrimSuffix(path, "."), "/", ".")
@@ -91,7 +96,7 @@ func (i *typescriptIndexer) IndexDir(ctx context.Context, dir string) (*schema.I
 
 			cursor := sitter.NewQueryCursor()
 			defer cursor.Close()
-			cursor.Exec(query, n)
+			cursor.Exec(query, rootNode)
 
 			mods[modName] = moduleInfo{path: path, docs: ""}
 
@@ -101,7 +106,6 @@ func (i *typescriptIndexer) IndexDir(ctx context.Context, dir string) (*schema.I
 					break
 				}
 				captures := getCaptures(query, match)
-
 				modDocs := joinCaptures(content, captures["module_docs"], "\n")
 				modDocs = sanitizeDocs(modDocs)
 
@@ -109,12 +113,44 @@ func (i *typescriptIndexer) IndexDir(ctx context.Context, dir string) (*schema.I
 				mods[modName] = moduleInfo{path: path}
 			}
 		}
-	}
 
-	// Functions
-	{
-		for _, mod := range mods {
-			// NEXT: setup go code intel properly, then resume
+		log.Printf(treeToString(content, rootNode))
+
+		// Functions
+		{
+			query, err := sitter.NewQuery([]byte(functionQuery), typescript.GetLanguage())
+			if err != nil {
+				return nil, errors.Wrap(err, "NewQuery(funcQuery)")
+			}
+			defer query.Close()
+
+			cursor := sitter.NewQueryCursor()
+			defer cursor.Close()
+			cursor.Exec(query, rootNode)
+
+			for {
+				match, ok := cursor.NextMatch()
+				if !ok {
+					break
+				}
+				captures := getCaptures(query, match)
+				funcDocs := firstCaptureContentOr(content, captures["func_docs"], "") // TODO
+				funcDocs = sanitizeDocs(funcDocs)
+				funcName := firstCaptureContentOr(content, captures["func_name"], "")
+				funcParams := firstCaptureContentOr(content, captures["func_params"], "")
+
+				funcLabel := schema.Markdown("function " + funcName + funcParams)
+
+				log.Printf("# funcName: %s", funcName)
+
+				functionsByMod[modName] = append(functionsByMod[modName], schema.Section{
+					ID:         funcName,
+					ShortLabel: funcName,
+					Label:      funcLabel,
+					Detail:     schema.Markdown(funcDocs),
+					SearchKey:  append([]string{modName}, ".", funcName),
+				})
+			}
 		}
 	}
 
@@ -167,6 +203,7 @@ func (i *typescriptIndexer) IndexDir(ctx context.Context, dir string) (*schema.I
 }
 
 type moduleInfo struct {
+	node *sitter.Node
 	path string
 	docs string
 }
@@ -223,17 +260,20 @@ var (
 	programQuery = `
 (program
 	.
-	(comment)* @comments
+	(comment)* @module_docs
 ) @program`
+
+	// TODO: func_params for arrow function syntax
+	// TODO: revisit lexical_declaration syntax; maybe remove exported funcs
 	functionQuery = `
 (program
 	(_)?
-	(comment)? @doc
+	(comment)? @func_docs
 	.
 	[
 		(lexical_declaration
 			(variable_declarator
-				(identifier) @name
+				(identifier) @func_name
 				[
 					(arrow_function)
 					(function)
@@ -241,14 +281,21 @@ var (
 			)
 		)
 		(function_declaration
-			(identifier) @name
+			name: (identifier) @func_name
+			parameters: (formal_parameters) @func_params
+		)
+		(export_statement
+			(function_declaration
+				name: (identifier) @func_name
+				parameters: (formal_parameters) @func_params
+			)
 		)
 	] @func
 )`
 	exportedVarQuery = `
 (program
 	(_)?
-	(comment)? @doc
+	(comment)? @var_docs
 	.
 	(export_statement
 		[
@@ -282,78 +329,9 @@ var (
 )`
 )
 
-var tsQueryTree = &SymbolQuery{
-	Query: programQuery,
-	NewSymbol: func(match *sitter.QueryMatch, c map[string][]*sitter.Node, namespace string, code []byte) *Symbol {
-		doc := strings.Join(getContents(c["comments"], code, cleanTypeScriptComment), "\n")
-		return NewSymbol(namespace, namespace, "module", doc, c["program"][0])
-	},
-	Children: []*SymbolQuery{
-		{
-			Query: functionQuery,
-			NewSymbol: func(match *sitter.QueryMatch, c map[string][]*sitter.Node, namespace string, code []byte) *Symbol {
-				doc := cleanTypeScriptComment(getContent(c["doc"], code))
-				name := getContent(c["name"], code)
-				return NewSymbol(path.Join(namespace, name), name, "func", doc, c["func"][0])
-			},
-		},
-		{
-			Query: exportedVarQuery,
-			NewSymbol: func(match *sitter.QueryMatch, c map[string][]*sitter.Node, namespace string, code []byte) *Symbol {
-				if _, isFunc := c["func_def"]; isFunc {
-					doc := cleanTypeScriptComment(getContent(c["doc"], code))
-					name := getContent(c["name"], code)
-					_, exported := c["export"]
-					return &Symbol{
-						URI:      path.Join(namespace, name),
-						Name:     name,
-						Type:     "func",
-						Doc:      doc,
-						Exported: exported,
-						Node:     c["decl"][0],
-					}
-				} else if _, isClass := c["class_def"]; isClass {
-					doc := cleanTypeScriptComment(getContent(c["doc"], code))
-					name := getContent(c["name"], code)
-					_, exported := c["export"]
-					return &Symbol{
-						URI:      path.Join(namespace, name),
-						Name:     name,
-						Type:     "class",
-						Doc:      doc,
-						Exported: exported,
-						Node:     c["class_def"][0],
-					}
-				} else {
-					doc := cleanTypeScriptComment(getContent(c["doc"], code))
-					name := getContent(c["name"], code)
-					_, exported := c["export"]
-					return &Symbol{
-						URI:      path.Join(namespace, name),
-						Name:     name,
-						Type:     "var",
-						Doc:      doc,
-						Exported: exported,
-						Node:     c["decl"][0],
-					}
-				}
-			},
-		},
-		{
-			Query: classQuery,
-			NewSymbol: func(match *sitter.QueryMatch, c map[string][]*sitter.Node, namespace string, code []byte) *Symbol {
-				doc := cleanTypeScriptComment(getContent(c["doc"], code))
-				name := getContent(c["name"], code)
-				_, exported := c["export"]
-				return &Symbol{
-					URI:      path.Join(namespace, name),
-					Name:     name,
-					Type:     "class",
-					Doc:      doc,
-					Exported: exported,
-					Node:     c["class"][0],
-				}
-			},
-		},
-	},
+func firstCaptureContentOr(content []byte, captures []*sitter.Node, defaultValue string) string {
+	if len(captures) > 0 {
+		return captures[0].Content(content)
+	}
+	return defaultValue
 }

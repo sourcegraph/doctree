@@ -5,6 +5,13 @@ import (
 	"os"
 
 	"github.com/hexops/cmder"
+
+	// Register language indexers.
+	_ "github.com/sourcegraph/doctree/doctree/indexer/golang"
+	_ "github.com/sourcegraph/doctree/doctree/indexer/javascript"
+	_ "github.com/sourcegraph/doctree/doctree/indexer/markdown"
+	_ "github.com/sourcegraph/doctree/doctree/indexer/python"
+	_ "github.com/sourcegraph/doctree/doctree/indexer/zig"
 )
 
 // commands contains all registered subcommands.

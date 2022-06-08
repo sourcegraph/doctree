@@ -38,9 +38,9 @@ type Location struct {
 }
 
 type LSIFBlob struct {
-	References      Location
-	Implementations Location
-	Definitions     Location
+	References      []Location
+	Implementations []Location
+	Definitions     []Location
 }
 
 type Blob struct {

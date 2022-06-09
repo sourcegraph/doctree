@@ -4,7 +4,6 @@ package typescript
 import (
 	"context"
 	"io/fs"
-	"log"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -107,14 +106,12 @@ func (i *typescriptIndexer) IndexDir(ctx context.Context, dir string) (*schema.I
 				}
 				captures := getCaptures(query, match)
 				modDocs := joinCaptures(content, captures["module_docs"], "\n")
-				modDocs = sanitizeDocs(modDocs)
+				modDocs = cleanTypeScriptComment(modDocs)
 
 				// mods[modName] = moduleInfo{path: path, docs: modDocs}
 				mods[modName] = moduleInfo{path: path}
 			}
 		}
-
-		log.Printf(treeToString(content, rootNode))
 
 		// Functions
 		{
@@ -135,13 +132,11 @@ func (i *typescriptIndexer) IndexDir(ctx context.Context, dir string) (*schema.I
 				}
 				captures := getCaptures(query, match)
 				funcDocs := firstCaptureContentOr(content, captures["func_docs"], "") // TODO
-				funcDocs = sanitizeDocs(funcDocs)
+				funcDocs = cleanTypeScriptComment(funcDocs)
 				funcName := firstCaptureContentOr(content, captures["func_name"], "")
 				funcParams := firstCaptureContentOr(content, captures["func_params"], "")
 
 				funcLabel := schema.Markdown("function " + funcName + funcParams)
-
-				log.Printf("# funcName: %s", funcName)
 
 				functionsByMod[modName] = append(functionsByMod[modName], schema.Section{
 					ID:         funcName,
@@ -152,6 +147,43 @@ func (i *typescriptIndexer) IndexDir(ctx context.Context, dir string) (*schema.I
 				})
 			}
 		}
+
+		// Classes
+		{
+			query, err := sitter.NewQuery([]byte(classQuery), typescript.GetLanguage())
+			if err != nil {
+				return nil, errors.Wrap(err, "NewQuery(classQuery)")
+			}
+			defer query.Close()
+
+			cursor := sitter.NewQueryCursor()
+			defer cursor.Close()
+			cursor.Exec(query, rootNode)
+
+			for {
+				match, ok := cursor.NextMatch()
+				if !ok {
+					break
+				}
+				captures := getCaptures(query, match)
+				className := firstCaptureContentOr(content, captures["class_name"], "")
+				superClasses := firstCaptureContentOr(content, captures["superclasses"], "")
+				classDocs := firstCaptureContentOr(content, captures["class_docs"], "") // TODO
+				classDocs = cleanTypeScriptComment(classDocs)
+				classLabel := schema.Markdown("class " + className + superClasses)
+
+				classesByMod[modName] = append(classesByMod[modName], schema.Section{
+					ID:         className,
+					ShortLabel: className,
+					Label:      classLabel,
+					Detail:     schema.Markdown(classDocs),
+					SearchKey:  append([]string{modName}, ".", className),
+				})
+
+				// TODO: class methods
+			}
+		}
+
 	}
 
 	// TODO: classes and functions and all that jazz
@@ -208,16 +240,6 @@ type moduleInfo struct {
 	docs string
 }
 
-// TODO: remove
-func sanitizeDocs(s string) string {
-	if strings.HasPrefix(s, "//") {
-		return strings.TrimPrefix(s, "//")
-	} else if strings.HasPrefix(s, "/*") {
-		return strings.TrimSuffix(strings.TrimPrefix(s, "/*"), "*/")
-	}
-	return s
-}
-
 var patternsToElide = []*regexp.Regexp{
 	regexp.MustCompile(`^/\*+\s?`),
 	regexp.MustCompile(`\s?\*+/$`),
@@ -270,27 +292,22 @@ var (
 	(_)?
 	(comment)? @func_docs
 	.
+	(export_statement
 	[
 		(lexical_declaration
 			(variable_declarator
-				(identifier) @func_name
-				[
-					(arrow_function)
-					(function)
-				]
+				name: (identifier) @func_name
+				value: (arrow_function
+					parameters: (formal_parameters) @func_params
+				)
 			)
 		)
 		(function_declaration
 			name: (identifier) @func_name
 			parameters: (formal_parameters) @func_params
 		)
-		(export_statement
-			(function_declaration
-				name: (identifier) @func_name
-				parameters: (formal_parameters) @func_params
-			)
-		)
 	] @func
+	)
 )`
 	exportedVarQuery = `
 (program
@@ -321,11 +338,13 @@ var (
 	classQuery = `
 (program
 	(_)?
-	(comment)? @doc
+	(comment)? @class_docs
 	.
-	(class_declaration
-		name: (type_identifier) @name
-	) @class
+	(export_statement
+		declaration: (class_declaration
+			name: (type_identifier) @class_name
+		) @class_declaration
+	)
 )`
 )
 

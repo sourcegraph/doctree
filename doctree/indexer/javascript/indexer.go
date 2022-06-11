@@ -3,11 +3,13 @@ package javascript
 
 import (
 	"context"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
 
+	jsdoc "github.com/DaivikDave/tree-sitter-jsdoc/bindings/go"
 	"github.com/pkg/errors"
 	sitter "github.com/smacker/go-tree-sitter"
 	"github.com/smacker/go-tree-sitter/javascript"
@@ -117,7 +119,7 @@ func (i *javascriptIndexer) IndexDir(ctx context.Context, dir string) (*schema.I
 		(
 			[
 				(
-					(comment)? @func_docs
+					(comment)* @func_docs
 					.
 					(
 						function_declaration
@@ -126,7 +128,7 @@ func (i *javascriptIndexer) IndexDir(ctx context.Context, dir string) (*schema.I
 					)
 				)
 				(
-					(comment)? @func_docs
+					(comment)* @func_docs
 					.
 					(
 						export_statement
@@ -246,31 +248,39 @@ func (i *javascriptIndexer) IndexDir(ctx context.Context, dir string) (*schema.I
 
 	var pages []schema.Page
 	for modName, moduleInfo := range mods {
-		functionsSection := schema.Section{
-			ID:         "func",
-			ShortLabel: "func",
-			Label:      "Functions",
-			SearchKey:  []string{},
-			Category:   true,
-			Children:   functionsByMod[modName],
+		sections := []schema.Section{}
+
+		if funcSections, ok := functionsByMod[modName]; ok && len(funcSections) > 0 {
+			sections = append(sections, schema.Section{
+				ID:         "func",
+				ShortLabel: "func",
+				Label:      "Functions",
+				SearchKey:  []string{},
+				Category:   true,
+				Children:   functionsByMod[modName],
+			})
 		}
 
-		classesSection := schema.Section{
-			ID:         "class",
-			ShortLabel: "class",
-			Label:      "Classes",
-			SearchKey:  []string{},
-			Category:   true,
-			Children:   classesByMod[modName],
+		if classSections, ok := classesByMod[modName]; ok && len(classSections) > 0 {
+			sections = append(sections, schema.Section{
+				ID:         "class",
+				ShortLabel: "class",
+				Label:      "Classes",
+				SearchKey:  []string{},
+				Category:   true,
+				Children:   classesByMod[modName],
+			})
 		}
 
-		pages = append(pages, schema.Page{
-			Path:      moduleInfo.path,
-			Title:     "Module " + modName,
-			Detail:    schema.Markdown(moduleInfo.docs),
-			SearchKey: []string{modName},
-			Sections:  []schema.Section{functionsSection, classesSection},
-		})
+		if len(sections) > 0 {
+			pages = append(pages, schema.Page{
+				Path:      moduleInfo.path,
+				Title:     "Module " + modName,
+				Detail:    schema.Markdown(moduleInfo.docs),
+				SearchKey: []string{modName},
+				Sections:  sections,
+			})
+		}
 	}
 
 	return &schema.Index{
@@ -308,8 +318,8 @@ func getFunctions(node *sitter.Node, content []byte, q string, searchKeyPrefix [
 			break
 		}
 		captures := getCaptures(query, match)
-		funcDocs := firstCaptureContentOr(content, captures["func_docs"], "")
-		funcDocs = sanitizeDocs(funcDocs)
+		funcDocs := joinCaptures(content, captures["func_docs"], "\n")
+		funcDocs = extractFunctionDocs(funcDocs)
 		funcName := firstCaptureContentOr(content, captures["func_name"], "")
 		funcParams := firstCaptureContentOr(content, captures["func_params"], "")
 
@@ -325,6 +335,100 @@ func getFunctions(node *sitter.Node, content []byte, q string, searchKeyPrefix [
 	}
 
 	return functions, nil
+}
+
+func extractFunctionDocs(s string) string {
+	// JSDoc comments must start with a /**
+	// sequence in order to be recognized by the JSDoc parser.
+	// Comments beginning with /*, /***, or more than 3 stars are ignored by Jsdoc Parser.
+	if strings.HasPrefix(s, "/**") && !strings.HasPrefix(s, "/***") {
+		comment := []byte(s)
+		funcDocs := ""
+		node, err := sitter.ParseCtx(context.Background(), comment, jsdoc.GetLanguage())
+		if err != nil {
+			return ""
+		}
+		query, err := sitter.NewQuery([]byte(`
+		(document (description) @func_description)
+		`), jsdoc.GetLanguage())
+		if err != nil {
+			return ""
+		}
+
+		defer query.Close()
+
+		cursor := sitter.NewQueryCursor()
+		defer cursor.Close()
+		cursor.Exec(query, node)
+
+		for {
+			match, ok := cursor.NextMatch()
+			if !ok {
+				break
+			}
+			captures := getCaptures(query, match)
+			funcDescription := firstCaptureContentOr(comment, captures["func_description"], "")
+			funcDocs += fmt.Sprintf("%s\n", funcDescription)
+		}
+
+		query, err = sitter.NewQuery([]byte(`
+		(
+			(tag 
+				(tag_name)? @tag
+				(type)? @identifier_type
+				(identifier)? @identifier_name 
+				(description)? @identifier_description
+			)	
+		)
+		`), jsdoc.GetLanguage())
+
+		if err != nil {
+			return ""
+		}
+
+		defer query.Close()
+
+		cursor.Exec(query, node)
+		argsSection := ""
+		returnSection := ""
+		for {
+
+			match, ok := cursor.NextMatch()
+			if !ok {
+				break
+			}
+			captures := getCaptures(query, match)
+			tag := firstCaptureContentOr(comment, captures["tag"], "")
+			identifierType := firstCaptureContentOr(comment, captures["identifier_type"], "")
+			if identifierType != "" {
+				identifierType = fmt.Sprintf(" (%s)", identifierType)
+			}
+			identifierName := firstCaptureContentOr(comment, captures["identifier_name"], "")
+			identifierDescription := firstCaptureContentOr(comment, captures["identifier_description"], "")
+			if identifierDescription != "" {
+				identifierDescription = fmt.Sprintf(": %s", identifierDescription)
+			}
+			switch tag {
+			case "@param":
+				argsSection += fmt.Sprintf("\n\t%s%s%s", identifierName, identifierType, identifierDescription)
+			case "@return":
+				returnSection += fmt.Sprintf("\n\t%s%s%s", identifierName, identifierType, identifierDescription)
+			}
+
+		}
+
+		if len(argsSection) > 0 {
+			funcDocs += fmt.Sprintf("\n Arguments:\n%s", argsSection)
+		}
+
+		if len(returnSection) > 0 {
+			funcDocs += fmt.Sprintf("\n Returns:\n%s", returnSection)
+		}
+
+		return funcDocs
+	}
+
+	return sanitizeDocs(s)
 }
 
 func sanitizeDocs(s string) string {

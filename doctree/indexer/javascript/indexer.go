@@ -115,33 +115,7 @@ func (i *javascriptIndexer) IndexDir(ctx context.Context, dir string) (*schema.I
 			}
 		}
 
-		funcDefQuery := `
-		(
-			[
-				(
-					(comment)* @func_docs
-					.
-					(
-						function_declaration
-							name: (identifier) @func_name
-							parameters: (formal_parameters) @func_params
-					)
-				)
-				(
-					(comment)* @func_docs
-					.
-					(
-						export_statement
-						value: (
-						function
-							name: (identifier) @func_name
-							parameters: (formal_parameters) @func_params
-						)
-					)	    
-				)
-			]
-		)
-		`
+		funcDefQuery := functionDefinitionQuery()
 
 		// Function definitions
 		{
@@ -210,7 +184,6 @@ func (i *javascriptIndexer) IndexDir(ctx context.Context, dir string) (*schema.I
 				classes := classesByMod[modName]
 
 				// Extract class methods:
-
 				classFuncQuery := `
 							(_
 								(comment)* @func_docs
@@ -322,9 +295,17 @@ func getFunctions(node *sitter.Node, content []byte, q string, searchKeyPrefix [
 		funcDocs = extractFunctionDocs(funcDocs)
 		funcName := firstCaptureContentOr(content, captures["func_name"], "")
 		funcParams := firstCaptureContentOr(content, captures["func_params"], "")
-
+		funcIdentifier := firstCaptureContentOr(content, captures["var_identifier"], "")
+		isArrowFunction := firstCaptureContentOr(content, captures["arrow_function"], "")
 		funcLabel := schema.Markdown("function " + funcName + funcParams)
-
+		if funcIdentifier != "" {
+			funcName = funcIdentifier
+			if isArrowFunction != "" {
+				funcLabel = schema.Markdown(funcName + " = " + funcParams)
+			} else {
+				funcLabel = schema.Markdown(funcName + " =  function " + funcParams)
+			}
+		}
 		functions = append(functions, schema.Section{
 			ID:         funcName,
 			ShortLabel: funcName,
@@ -433,11 +414,109 @@ func extractFunctionDocs(s string) string {
 
 func sanitizeDocs(s string) string {
 	if strings.HasPrefix(s, "//") {
+		s = strings.ReplaceAll(s, "\n//", "\n")
 		return strings.TrimPrefix(s, "//")
 	} else if strings.HasPrefix(s, "/*") {
 		return strings.TrimSuffix(strings.TrimPrefix(s, "/*"), "*/")
 	}
 	return s
+}
+
+func functionDefinitionQuery() string {
+
+	functionDefinition := `(
+		function
+			name: (identifier)? @func_name
+			parameters: (formal_parameters) @func_params
+	) `
+
+	arrowFunctionDefinition := `(
+		arrow_function
+			parameters: (formal_parameters) @func_params
+	) @arrow_function`
+
+	// function myfunc(){}
+	funcDeclaration := ` 			
+	(
+		(comment)* @func_docs
+		.
+		(
+			function_declaration
+				name: (identifier) @func_name
+				parameters: (formal_parameters) @func_params
+		)
+	)
+	`
+	// var myfunction = function(a,b){}
+	// var myfunction = (a,b) => {}
+	funcAssignmentExpression := fmt.Sprintf(`(
+		(comment)* @func_docs
+		.
+		(lexical_declaration
+			(_
+				name: (identifier) @var_identifier
+				value: [
+					%s
+					%s
+				]
+				
+			
+			)
+		)
+	)`, functionDefinition, arrowFunctionDefinition)
+
+	// export default myfunc = function(){}
+	// export default myfunc = () => {}
+	funcExportExpression := fmt.Sprintf(`(
+		(comment)* @func_docs
+		.
+		(export_statement
+			(lexical_declaration
+				(_
+					name: (identifier) @var_identifier
+					value: [
+						%s
+						%s
+					]
+								
+				)
+			)?
+			value:([
+				%s
+				%s
+			])?
+		)
+		
+	)`, functionDefinition, arrowFunctionDefinition, functionDefinition, arrowFunctionDefinition)
+
+	// module.exports = function(){}
+	funcExpressionStatementAssignment := fmt.Sprintf(`
+	(
+		(comment)* @func_docs
+		.
+		(expression_statement
+			(assignment_expression
+				left: (_) @var_identifier
+				right: 
+				[
+					%s
+					%s
+				]			
+			)
+		)
+	)`, functionDefinition, arrowFunctionDefinition)
+
+	query := fmt.Sprintf(`
+	(
+		[
+			%s
+			%s
+			%s
+			%s	
+		]
+	 )
+	`, funcDeclaration, funcAssignmentExpression, funcExportExpression, funcExpressionStatementAssignment)
+	return query
 }
 
 type moduleInfo struct {

@@ -28,12 +28,13 @@ func New(opt Options) Client {
 		Dial: func(network, addr string) (net.Conn, error) {
 			return net.DialTimeout(network, addr, 3*time.Second)
 		},
+		ResponseHeaderTimeout: 0,
 	}
 	return &graphQLClient{
 		opt: opt,
 		client: &http.Client{
 			Transport: tr,
-			Timeout:   3 * time.Second,
+			Timeout:   60 * time.Second,
 		},
 	}
 }

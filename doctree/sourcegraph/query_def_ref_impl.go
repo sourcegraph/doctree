@@ -9,34 +9,49 @@ import (
 	"github.com/pkg/errors"
 )
 
-func defRefImplQuery(n int) string {
+func defRefImplQuery(args DefRefImplArgs) string {
 	var aliased []string
 	var params []string
-	for i := 0; i < n; i++ {
-		params = append(params, fmt.Sprintf("$line%v: Int!, $character%v: Int!", i, i))
-		aliased = append(aliased, fmt.Sprintf(`
-							references%v: references(
-								line: $line%v
-								character: $character%v
+
+	for fileIndex, file := range args.Files {
+		params = append(params, fmt.Sprintf("$file%vpath: String!", fileIndex))
+		var aliasedFile []string
+		for i := range file.Positions {
+			params = append(params, fmt.Sprintf("$file%vline%v: Int!", fileIndex, i))
+			params = append(params, fmt.Sprintf("$file%vcharacter%v: Int!", fileIndex, i))
+			aliasedFile = append(aliasedFile, strings.ReplaceAll(strings.ReplaceAll(`
+							references#P: references(
+								line: $file#Fline#P
+								character: $file#Fcharacter#P
 								first: $firstReferences
 								after: $afterReferences
 								filter: $filter
 							) {
 								...LocationConnectionFields
 							}
-							implementations%v: implementations(
-								line: $line%v
-								character: $character%v
-								first: $firstImplementations
-								after: $afterImplementations
-								filter: $filter
-							) {
+							# TODO: query implementations once that API does not take down prod:
+							# https://github.com/sourcegraph/sourcegraph/issues/36882
+							#implementations#P: implementations(
+							#	line: $file#Fline#P
+							#	character: $file#Fcharacter#P
+							#	first: $firstImplementations
+							#	after: $afterImplementations
+							#	filter: $filter
+							#) {
+							#	...LocationConnectionFields
+							#}
+							definitions#P: definitions(line: $file#Fline#P, character: $file#Fcharacter#P, filter: $filter) {
 								...LocationConnectionFields
 							}
-							definitions%v: definitions(line: $line%v, character: $character%v, filter: $filter) {
-								...LocationConnectionFields
-							}
-		`, i, i, i, i, i, i, i, i, i))
+			`, "#F", fmt.Sprint(fileIndex)), "#P", fmt.Sprint(i)))
+		}
+		aliased = append(aliased, fmt.Sprintf(`
+					blob%v: blob(path: $file%vpath) {
+						lsif {
+							%s
+						}
+					}
+		`, fileIndex, fileIndex, strings.Join(aliasedFile, "\n")))
 	}
 
 	return fmt.Sprintf(`
@@ -69,7 +84,16 @@ func defRefImplQuery(n int) string {
 			}
 		}
 
-		query UsePreciseCodeIntelForPosition($repositoryCloneUrl: String!, $commit: String!, $path: String!, $afterReferences: String, $firstReferences: Int, $afterImplementations: String, $firstImplementations: Int, $filter: String, %s) {
+		query UsePreciseCodeIntelForPosition(
+			$repositoryCloneUrl: String!,
+			$commit: String!,
+			$afterReferences: String,
+			$firstReferences: Int,
+			# TODO: query implementations once that API does not take down prod:
+			# https://github.com/sourcegraph/sourcegraph/issues/36882
+			#$afterImplementations: String,
+			#$firstImplementations: Int,
+			$filter: String, %s) {
 			repository(cloneURL: $repositoryCloneUrl) {
 				id
 				name
@@ -78,11 +102,7 @@ func defRefImplQuery(n int) string {
 				isArchived
 				commit(rev: $commit) {
 					id
-					blob(path: $path) {
-						lsif {
-							%s
-						}
-					}
+					%s
 				}
 			}
 		}
@@ -94,12 +114,16 @@ type Position struct {
 	Character uint `json:"character"`
 }
 
+type File struct {
+	Path      string `json:"path"`
+	Positions []Position
+}
+
 type DefRefImplArgs struct {
 	AfterImplementations *string `json:"afterImplementations"`
 	AfterReferences      *string `json:"afterReferences"`
 	RepositoryCloneURL   string  `json:"repositoryCloneUrl"`
-	Path                 string  `json:"path"`
-	Positions            []Position
+	Files                []File
 	Commit               string  `json:"commit"`
 	Filter               *string `json:"filter"`
 	FirstImplementations uint    `json:"firstImplementations"`
@@ -111,18 +135,20 @@ func (c *graphQLClient) DefRefImpl(ctx context.Context, args DefRefImplArgs) (*R
 		"afterImplementations": args.AfterImplementations,
 		"afterReferences":      args.AfterReferences,
 		"repositoryCloneUrl":   args.RepositoryCloneURL,
-		"path":                 args.Path,
 		"commit":               args.Commit,
 		"filter":               args.Filter,
 		"firstImplementations": args.FirstImplementations,
 		"firstReferences":      args.FirstReferences,
 	}
-	for i, pos := range args.Positions {
-		vars[fmt.Sprintf("line%v", i)] = pos.Line
-		vars[fmt.Sprintf("character%v", i)] = pos.Character
+	for fileIndex, file := range args.Files {
+		vars[fmt.Sprintf("file%vpath", fileIndex)] = file.Path
+		for i, pos := range file.Positions {
+			vars[fmt.Sprintf("file%vline%v", fileIndex, i)] = pos.Line
+			vars[fmt.Sprintf("file%vcharacter%v", fileIndex, i)] = pos.Character
+		}
 	}
 
-	resp, err := c.requestGraphQL(ctx, "DefRefImpl", defRefImplQuery(len(args.Positions)), vars)
+	resp, err := c.requestGraphQL(ctx, "DefRefImpl", defRefImplQuery(args), vars)
 	if err != nil {
 		return nil, errors.Wrap(err, "graphql")
 	}
@@ -135,36 +161,55 @@ func (c *graphQLClient) DefRefImpl(ctx context.Context, args DefRefImplArgs) (*R
 		return nil, errors.Wrap(err, "Unmarshal")
 	}
 	var (
-		r               = raw.Data.Repository
-		references      []Location
-		implementations []Location
-		definitions     []Location
+		r     = raw.Data.Repository
+		blobs []Blob
 	)
-	decodeLocation := func(name string, dst *[]Location) error {
-		raw, ok := r.Commit.Blob.LSIF[name]
+	for fileIndex, file := range args.Files {
+		rawBlob, ok := r.Commit[fmt.Sprintf("blob%v", fileIndex)]
 		if !ok {
+			continue
+		}
+		var info struct {
+			LSIF map[string]json.RawMessage
+		}
+		if err := json.Unmarshal(rawBlob, &info); err != nil {
+			return nil, errors.Wrap(err, "Unmarshal")
+		}
+
+		decodeLocation := func(name string, dst *[]Location) error {
+			raw, ok := info.LSIF[name]
+			if !ok {
+				return nil
+			}
+			var result *Location
+			if err := json.Unmarshal(raw, &result); err != nil {
+				return errors.Wrap(err, "Unmarshal")
+			}
+			if result != nil {
+				*dst = append(*dst, *result)
+			}
 			return nil
 		}
-		var result *Location
-		if err := json.Unmarshal(raw, &result); err != nil {
-			return errors.Wrap(err, "Unmarshal")
+		blob := Blob{LSIF: &LSIFBlob{}}
+		for i := range file.Positions {
+			if err := decodeLocation(fmt.Sprintf("references%v", i), &blob.LSIF.References); err != nil {
+				return nil, errors.Wrap(err, "decodeLocation(references)")
+			}
+			// TODO: query implementations once that API does not take down prod:
+			// https://github.com/sourcegraph/sourcegraph/issues/36882
+			// if err := decodeLocation(fmt.Sprintf("implementations%v", i), &blob.LSIF.Implementations); err != nil {
+			// 	return nil, errors.Wrap(err, "decodeLocation(implementations)")
+			// }
+			if err := decodeLocation(fmt.Sprintf("definitions%v", i), &blob.LSIF.Definitions); err != nil {
+				return nil, errors.Wrap(err, "decodeLocation(definitions)")
+			}
 		}
-		if result != nil {
-			*dst = append(*dst, *result)
-		}
-		return nil
+		blobs = append(blobs, blob)
 	}
-	for i := range args.Positions {
-		if err := decodeLocation(fmt.Sprintf("references%v", i), &references); err != nil {
-			return nil, errors.Wrap(err, "decodeLocation(references)")
-		}
-		if err := decodeLocation(fmt.Sprintf("implementations%v", i), &implementations); err != nil {
-			return nil, errors.Wrap(err, "decodeLocation(implementations)")
-		}
-		if err := decodeLocation(fmt.Sprintf("definitions%v", i), &definitions); err != nil {
-			return nil, errors.Wrap(err, "decodeLocation(definitions)")
-		}
-	}
+	var commitID string
+	_ = json.Unmarshal(r.Commit["id"], &commitID)
+	var commitOID string
+	_ = json.Unmarshal(r.Commit["oid"], &commitOID)
 	return &Repository{
 		ID:         r.ID,
 		Name:       r.Name,
@@ -172,27 +217,11 @@ func (c *graphQLClient) DefRefImpl(ctx context.Context, args DefRefImplArgs) (*R
 		IsFork:     r.IsFork,
 		IsArchived: r.IsArchived,
 		Commit: &Commit{
-			ID:  r.Commit.ID,
-			OID: r.Commit.OID,
-			Blob: &Blob{
-				LSIF: &LSIFBlob{
-					References:      references,
-					Implementations: implementations,
-					Definitions:     definitions,
-				},
-			},
+			ID:    commitID,
+			OID:   commitOID,
+			Blobs: blobs,
 		},
 	}, nil
-}
-
-type DefRefImplBlob struct {
-	LSIF map[string]json.RawMessage
-}
-
-type DefRefImplCommit struct {
-	ID   string
-	OID  string
-	Blob *DefRefImplBlob
 }
 
 type DefRefImplRepository struct {
@@ -201,5 +230,5 @@ type DefRefImplRepository struct {
 	Stars      uint64
 	IsFork     bool
 	IsArchived bool
-	Commit     *DefRefImplCommit `json:"commit"`
+	Commit     map[string]json.RawMessage
 }

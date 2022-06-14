@@ -48,9 +48,9 @@ type Blob struct {
 }
 
 type Commit struct {
-	ID   string
-	OID  string
-	Blob *Blob
+	ID    string
+	OID   string
+	Blobs []Blob
 }
 
 type Repository struct {

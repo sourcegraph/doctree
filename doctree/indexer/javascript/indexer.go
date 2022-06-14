@@ -423,7 +423,6 @@ func sanitizeDocs(s string) string {
 }
 
 func functionDefinitionQuery() string {
-
 	functionDefinition := `(
 		function
 			name: (identifier)? @func_name

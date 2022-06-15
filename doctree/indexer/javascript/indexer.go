@@ -119,7 +119,6 @@ func (i *javascriptIndexer) IndexDir(ctx context.Context, dir string) (*schema.I
 
 		// Function definitions
 		{
-
 			modFunctions, err := getFunctions(n, content, funcDefQuery, []string{modName})
 			if err != nil {
 				return nil, err
@@ -330,7 +329,15 @@ func extractFunctionDocs(s string) string {
 			return ""
 		}
 		query, err := sitter.NewQuery([]byte(`
-		(document (description) @func_description)
+		(document
+			(description)? @func_description
+			(tag
+				(tag_name)? @tag_name
+				(type)? @identifier_type
+				(identifier)? @identifier_name
+				(description)? @identifier_description
+			)
+		)*
 		`), jsdoc.GetLanguage())
 		if err != nil {
 			return ""
@@ -342,6 +349,8 @@ func extractFunctionDocs(s string) string {
 		defer cursor.Close()
 		cursor.Exec(query, node)
 
+		argsSection := ""
+		returnSection := ""
 		for {
 			match, ok := cursor.NextMatch()
 			if !ok {
@@ -350,36 +359,7 @@ func extractFunctionDocs(s string) string {
 			captures := getCaptures(query, match)
 			funcDescription := firstCaptureContentOr(comment, captures["func_description"], "")
 			funcDocs += fmt.Sprintf("%s\n", funcDescription)
-		}
 
-		query, err = sitter.NewQuery([]byte(`
-		(
-			(tag 
-				(tag_name)? @tag
-				(type)? @identifier_type
-				(identifier)? @identifier_name 
-				(description)? @identifier_description
-			)	
-		)
-		`), jsdoc.GetLanguage())
-
-		if err != nil {
-			return ""
-		}
-
-		defer query.Close()
-
-		cursor.Exec(query, node)
-		argsSection := ""
-		returnSection := ""
-		for {
-
-			match, ok := cursor.NextMatch()
-			if !ok {
-				break
-			}
-			captures := getCaptures(query, match)
-			tag := firstCaptureContentOr(comment, captures["tag"], "")
 			identifierType := firstCaptureContentOr(comment, captures["identifier_type"], "")
 			if identifierType != "" {
 				identifierType = fmt.Sprintf(" (%s)", identifierType)
@@ -389,13 +369,14 @@ func extractFunctionDocs(s string) string {
 			if identifierDescription != "" {
 				identifierDescription = fmt.Sprintf(": %s", identifierDescription)
 			}
-			switch tag {
+
+			tagName := firstCaptureContentOr(comment, captures["tag_name"], "")
+			switch tagName {
 			case "@param":
 				argsSection += fmt.Sprintf("\n\t%s%s%s", identifierName, identifierType, identifierDescription)
 			case "@return":
 				returnSection += fmt.Sprintf("\n\t%s%s%s", identifierName, identifierType, identifierDescription)
 			}
-
 		}
 
 		if len(argsSection) > 0 {

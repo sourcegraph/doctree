@@ -269,6 +269,11 @@ tasks:
     deps:
       - task: build-elm-release
 
+  ops-ssh:
+    desc: "SSH doctree.org"
+    cmds:
+      - ssh root@164.92.76.86
+
   ops-add-repo:
     desc: "Add a repo to doctree.org (requires operations access)"
     cmds:

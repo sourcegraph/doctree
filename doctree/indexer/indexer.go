@@ -416,11 +416,11 @@ func RunMigrations(ctx context.Context, cloudMode bool, dataDir, indexDataDir st
 		projectDir := filepath.Join(indexDataDir, encodeProjectName(projectName))
 
 		data, err := os.ReadFile(filepath.Join(projectDir, "version"))
-		if err != nil {
+		if err != nil && !os.IsNotExist(err) {
 			return errors.Wrap(err, "Read project version")
 		}
 
-		if string(data) != projectDirVersion {
+		if (string(data) != projectDirVersion) || os.IsNotExist(err) {
 			// Project dir version has changed. Need to reindex.
 			if cloudMode {
 				log.Println("migration: doctree schema has changed, reindexing:", projectName)

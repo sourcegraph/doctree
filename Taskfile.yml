@@ -353,6 +353,7 @@ tasks:
       - cd ../doctree-samples/ && git clone --depth 1 https://github.com/django/django
       - cd ../doctree-samples/ && git clone --depth 1 https://github.com/Sobeston/ziglearn
       - cd ../doctree-samples/ && git clone --depth 1 https://github.com/ziglang/zig
+      - cd ../doctree-samples/ && git clone --depth 1 https://github.com/tailwindlabs/tailwindcss
 
   dev-index-sample-repos:
     desc: "Index sample repos for dev environment"
@@ -366,3 +367,5 @@ tasks:
       - cd ../doctree-samples/ziglearn && ../../doctree/.bin/doctree index .
       # Zig
       - cd ../doctree-samples/ziglang/lib/std && ../../doctree/.bin/doctree index -project=github.com/ziglang/zig .
+      # JavaScript
+      - cd ../doctree-samples/tailwindcss && ../../doctree/.bin/doctree index .

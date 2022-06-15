@@ -358,7 +358,7 @@ func extractFunctionDocs(s string) string {
 			}
 			captures := getCaptures(query, match)
 			funcDescription := firstCaptureContentOr(comment, captures["func_description"], "")
-			funcDocs += fmt.Sprintf("%s\n", funcDescription)
+			funcDocs = fmt.Sprintf("%s\n", funcDescription)
 
 			identifierType := firstCaptureContentOr(comment, captures["identifier_type"], "")
 			if identifierType != "" {

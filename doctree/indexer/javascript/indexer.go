@@ -177,7 +177,7 @@ func (i *javascriptIndexer) IndexDir(ctx context.Context, dir string) (*schema.I
 				className := firstCaptureContentOr(content, captures["class_name"], "")
 				superClasses := firstCaptureContentOr(content, captures["superclasses"], "")
 				classDocs := firstCaptureContentOr(content, captures["class_docs"], "\n")
-				classDocs = sanitizeDocs(classDocs)
+				classDocs = extractClassDocs(classDocs)
 
 				classLabel := schema.Markdown("class " + className + superClasses)
 				classes := classesByMod[modName]
@@ -317,80 +317,149 @@ func getFunctions(node *sitter.Node, content []byte, q string, searchKeyPrefix [
 	return functions, nil
 }
 
+func extractClassDocs(s string) string {
+	// JSDoc comments must start with a /**
+	// sequence in order to be recognized by the JSDoc parser.
+	// Comments beginning with /*, /***, or more than 3 stars are ignored by Jsdoc Parser.
+	if !strings.HasPrefix(s, "/**") && strings.HasPrefix(s, "/***") {
+		return sanitizeDocs(s)
+	}
+
+	comment := []byte(s)
+	classDocs := ""
+	node, err := sitter.ParseCtx(context.Background(), comment, jsdoc.GetLanguage())
+	if err != nil {
+		return ""
+	}
+	query, err := sitter.NewQuery([]byte(`
+	(document
+		(description)? @class_description
+		(tag
+			(tag_name)? @tag_name
+			(type)? @identifier_type
+			(identifier)? @identifier_name
+			(description)? @identifier_description
+		)
+	)*
+	`), jsdoc.GetLanguage())
+	if err != nil {
+		return ""
+	}
+
+	defer query.Close()
+
+	cursor := sitter.NewQueryCursor()
+	defer cursor.Close()
+	cursor.Exec(query, node)
+
+	propertiesSection := ""
+	for {
+		match, ok := cursor.NextMatch()
+		if !ok {
+			break
+		}
+		captures := getCaptures(query, match)
+		classDescription := firstCaptureContentOr(comment, captures["class_description"], "")
+		classDocs = fmt.Sprintf("%s\n", classDescription)
+
+		identifierType := firstCaptureContentOr(comment, captures["identifier_type"], "")
+		if identifierType != "" {
+			identifierType = fmt.Sprintf(" (%s)", identifierType)
+		}
+		identifierName := firstCaptureContentOr(comment, captures["identifier_name"], "")
+		identifierDescription := firstCaptureContentOr(comment, captures["identifier_description"], "")
+		if identifierDescription != "" {
+			identifierDescription = fmt.Sprintf(": %s", identifierDescription)
+		}
+
+		tagName := firstCaptureContentOr(comment, captures["tag_name"], "")
+		switch tagName {
+		case "@property":
+			propertiesSection += fmt.Sprintf("\n\t%s%s%s", identifierName, identifierType, identifierDescription)
+		}
+	}
+
+	if len(propertiesSection) > 0 {
+		classDocs += fmt.Sprintf("\n Properties:\n%s", propertiesSection)
+	}
+
+	return classDocs
+}
+
 func extractFunctionDocs(s string) string {
 	// JSDoc comments must start with a /**
 	// sequence in order to be recognized by the JSDoc parser.
 	// Comments beginning with /*, /***, or more than 3 stars are ignored by Jsdoc Parser.
-	if strings.HasPrefix(s, "/**") && !strings.HasPrefix(s, "/***") {
-		comment := []byte(s)
-		funcDocs := ""
-		node, err := sitter.ParseCtx(context.Background(), comment, jsdoc.GetLanguage())
-		if err != nil {
-			return ""
-		}
-		query, err := sitter.NewQuery([]byte(`
-		(document
-			(description)? @func_description
-			(tag
-				(tag_name)? @tag_name
-				(type)? @identifier_type
-				(identifier)? @identifier_name
-				(description)? @identifier_description
-			)
-		)*
-		`), jsdoc.GetLanguage())
-		if err != nil {
-			return ""
-		}
-
-		defer query.Close()
-
-		cursor := sitter.NewQueryCursor()
-		defer cursor.Close()
-		cursor.Exec(query, node)
-
-		argsSection := ""
-		returnSection := ""
-		for {
-			match, ok := cursor.NextMatch()
-			if !ok {
-				break
-			}
-			captures := getCaptures(query, match)
-			funcDescription := firstCaptureContentOr(comment, captures["func_description"], "")
-			funcDocs = fmt.Sprintf("%s\n", funcDescription)
-
-			identifierType := firstCaptureContentOr(comment, captures["identifier_type"], "")
-			if identifierType != "" {
-				identifierType = fmt.Sprintf(" (%s)", identifierType)
-			}
-			identifierName := firstCaptureContentOr(comment, captures["identifier_name"], "")
-			identifierDescription := firstCaptureContentOr(comment, captures["identifier_description"], "")
-			if identifierDescription != "" {
-				identifierDescription = fmt.Sprintf(": %s", identifierDescription)
-			}
-
-			tagName := firstCaptureContentOr(comment, captures["tag_name"], "")
-			switch tagName {
-			case "@param":
-				argsSection += fmt.Sprintf("\n\t%s%s%s", identifierName, identifierType, identifierDescription)
-			case "@return":
-				returnSection += fmt.Sprintf("\n\t%s%s%s", identifierName, identifierType, identifierDescription)
-			}
-		}
-
-		if len(argsSection) > 0 {
-			funcDocs += fmt.Sprintf("\n Arguments:\n%s", argsSection)
-		}
-
-		if len(returnSection) > 0 {
-			funcDocs += fmt.Sprintf("\n Returns:\n%s", returnSection)
-		}
-
-		return funcDocs
+	if !strings.HasPrefix(s, "/**") && strings.HasPrefix(s, "/***") {
+		return sanitizeDocs(s)
 	}
 
-	return sanitizeDocs(s)
+	comment := []byte(s)
+	funcDocs := ""
+	node, err := sitter.ParseCtx(context.Background(), comment, jsdoc.GetLanguage())
+	if err != nil {
+		return ""
+	}
+	query, err := sitter.NewQuery([]byte(`
+	(document
+		(description)? @func_description
+		(tag
+			(tag_name)? @tag_name
+			(type)? @identifier_type
+			(identifier)? @identifier_name
+			(description)? @identifier_description
+		)
+	)*
+	`), jsdoc.GetLanguage())
+	if err != nil {
+		return ""
+	}
+
+	defer query.Close()
+
+	cursor := sitter.NewQueryCursor()
+	defer cursor.Close()
+	cursor.Exec(query, node)
+
+	argsSection := ""
+	returnSection := ""
+	for {
+		match, ok := cursor.NextMatch()
+		if !ok {
+			break
+		}
+		captures := getCaptures(query, match)
+		funcDescription := firstCaptureContentOr(comment, captures["func_description"], "")
+		funcDocs = fmt.Sprintf("%s\n", funcDescription)
+
+		identifierType := firstCaptureContentOr(comment, captures["identifier_type"], "")
+		if identifierType != "" {
+			identifierType = fmt.Sprintf(" (%s)", identifierType)
+		}
+		identifierName := firstCaptureContentOr(comment, captures["identifier_name"], "")
+		identifierDescription := firstCaptureContentOr(comment, captures["identifier_description"], "")
+		if identifierDescription != "" {
+			identifierDescription = fmt.Sprintf(": %s", identifierDescription)
+		}
+
+		tagName := firstCaptureContentOr(comment, captures["tag_name"], "")
+		switch tagName {
+		case "@param":
+			argsSection += fmt.Sprintf("\n\t%s%s%s", identifierName, identifierType, identifierDescription)
+		case "@return":
+			returnSection += fmt.Sprintf("\n\t%s%s%s", identifierName, identifierType, identifierDescription)
+		}
+	}
+
+	if len(argsSection) > 0 {
+		funcDocs += fmt.Sprintf("\n Arguments:\n%s", argsSection)
+	}
+
+	if len(returnSection) > 0 {
+		funcDocs += fmt.Sprintf("\n Returns:\n%s", returnSection)
+	}
+
+	return funcDocs
 }
 
 func sanitizeDocs(s string) string {

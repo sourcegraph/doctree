@@ -196,6 +196,11 @@ func GetIndex(ctx context.Context, dataDir, indexDataDir, projectName string, au
 		return nil, errors.New("potentially malicious index name (this is likely a bug)")
 	}
 
+	// ignore .gitignore or .bazelignore file
+	if strings.Contains(indexName, ".gitignore") || strings.Contains(indexName, ".bazelignore") {
+		return nil, errors.New("files to be ignored")
+	}
+
 	indexes := apischema.ProjectIndexes{}
 	dir, err := ioutil.ReadDir(filepath.Join(indexDataDir, indexName))
 	if os.IsNotExist(err) {

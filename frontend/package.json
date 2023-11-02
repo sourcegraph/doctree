@@ -5,7 +5,7 @@
   "license": "Apache",
   "private": true,
   "devDependencies": {
-    "elm": "^0.19.1-5"
+    "elm": "^0.19.1-6"
   },
   "dependencies": {
     "elm-live": "^4.0.2"

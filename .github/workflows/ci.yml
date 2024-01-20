@@ -29,7 +29,7 @@ jobs:
         run: task cross-compile
       - name: Record latest release version
         id: recorded_release_version
-        run: echo "::set-output name=commit::$(git log --oneline | head -n1 | cut -d " " -f1)"
+        run: echo "commit=$(git log --oneline | head -n1 | cut -d " " -f1)" >> "$GITHUB_OUTPUT"
       - name: Release
         if: success() && github.ref == 'refs/heads/main' && github.event_Name == 'push' && github.repository == 'sourcegraph/doctree'
         run: |

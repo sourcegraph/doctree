@@ -10,7 +10,7 @@ ENV GOBIN /out
 RUN cd /doctree && go install ./cmd/doctree
 
 # Dockerfile based on guidelines at https://github.com/hexops/dockerfile
-FROM alpine:3.16@sha256:686d8c9dfa6f3ccfc8230bc3178d23f84eeaf7e457f36f271ab1acc53015037c
+FROM alpine:3.20@sha256:0a4eaa0eecf5f8c050e5bba433f58c052be7587ee8af3e8b3910ef9ab5fbe9f5
 
 # Non-root user for security purposes.
 #

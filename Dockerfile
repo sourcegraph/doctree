@@ -2,7 +2,7 @@
 ###############################
 # Build the doctree Go binary #
 ###############################
-FROM golang:1.18-alpine as builder
+FROM golang:1.23-alpine@sha256:eb37f58646a901dc7727cf448cae36daaefaba79de33b5058dab79aa4c04aefb as builder
 
 RUN apk add --no-cache git build-base
 COPY . /doctree
